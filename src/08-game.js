@@ -227,39 +227,40 @@ function updateInteriorLights() {
 }
 
 // ---------- flight ----------
-function shipAxisClosest(p, out) { tmpV2.set(0, 2, -60); const a = SP.ship.localToWorld(tmpV2.clone()); tmpV2.set(0, 2, 290); const b = SP.ship.localToWorld(tmpV2.clone()); const ab = b.sub(a); const t = clamp(p.clone().sub(a).dot(ab) / ab.lengthSq(), 0, 1); return (out || new THREE.Vector3()).copy(a).addScaledVector(ab, t); }
+function shipAxisClosest(p, out) { tmpV2.set(0, 3, -40); const a = SP.ship.localToWorld(tmpV2.clone()); tmpV2.set(0, 3, 960); const b = SP.ship.localToWorld(tmpV2.clone()); const ab = b.sub(a); const t = clamp(p.clone().sub(a).dot(ab) / ab.lengthSq(), 0, 1); return (out || new THREE.Vector3()).copy(a).addScaledVector(ab, t); }
 function updateFlight(dt, controlling) {
   const S = G.ship; const a = controlling ? moveAxis() : { x: 0, y: 0 };
-  const boost = controlling && IN.hold.run; const maxS = boost ? 78 : 44;
+  const boost = false; const maxS = 110;
   const fwd = new THREE.Vector3(-Math.sin(S.yaw), 0, -Math.cos(S.yaw));
   let thr = -a.y; S.thr = lerp(S.thr, thr, dt * 2);
-  S.vel.addScaledVector(fwd, thr * (boost ? 16 : 9) * dt);
-  let vy = (controlling ? (IN.hold.up ? 1 : 0) - (IN.hold.down ? 1 : 0) : 0); S.vel.y += vy * 8 * dt;
-  const turn = -a.x * .32; S.yaw += turn * dt * (1 - Math.min(.5, S.vel.length() / 200)); S.bank = lerp(S.bank, turn * .5 * Math.min(1, S.vel.length() / 25), dt * 2);
+  S.vel.addScaledVector(fwd, thr * 20 * dt);
+  let vy = (controlling ? (IN.hold.up ? 1 : 0) - (IN.hold.down ? 1 : 0) : 0); S.vel.y += vy * 22 * dt;
+  const turn = -a.x * .32; S.yaw += turn * dt * (1 - Math.min(.5, S.vel.length() / 300)); S.bank = lerp(S.bank, turn * .5 * Math.min(1, S.vel.length() / 25), dt * 2);
   // drag: lateral drift dies faster than forward motion
-  const fs = S.vel.dot(fwd); const lat = S.vel.clone().addScaledVector(fwd, -fs); lat.y *= .2;
-  S.vel.addScaledVector(lat, -Math.min(1, dt * 1.2)); S.vel.y *= 1 - Math.min(1, dt * 1.2);
+  const fs = S.vel.dot(fwd); const lat = S.vel.clone().addScaledVector(fwd, -fs); lat.y *= .05;
+  S.vel.addScaledVector(lat, -Math.min(1, dt * 1.2)); S.vel.y *= 1 - Math.min(1, dt * .5);
   if (!controlling || Math.abs(thr) < .05) S.vel.multiplyScalar(1 - Math.min(1, dt * (controlling ? .25 : .6)));
   const sp = S.vel.length(); if (sp > maxS) S.vel.multiplyScalar(lerp(1, maxS / sp, dt * 2));
   S.pos.addScaledVector(S.vel, dt); S.speed = S.vel.length();
   { const off = S.pos.clone().sub(SP.bubC), d = off.length(), R0 = SP.bubR - 380; G.atEdge = d > R0 - 200;
     if (d > R0) { off.divideScalar(d); const out = S.vel.dot(off); if (out > 0) S.vel.addScaledVector(off, -out * Math.min(1, dt * 3)); S.vel.addScaledVector(off, -(d - R0) * .15 * dt); if (d > R0 + 200) S.pos.copy(SP.bubC).addScaledVector(off, R0 + 200); } }
   SP.ship.position.copy(S.pos); SP.ship.rotation.set(0, S.yaw, S.bank, 'YXZ'); SP.ship.updateMatrixWorld();
-  if (boost && !G._boost) sfx('boost', .6); G._boost = boost;
   // noise
-  G.noise = clamp(S.speed / 44 * (boost ? 1.4 : 1) * (1 - .3 * G.up.hush), 0, 1.6);
+  G.noise = clamp(S.speed / 80 * (1 - .3 * G.up.hush), 0, 1.6);
   const inside = G.state !== 'helm' || G.view === 'bridge';
-  loopTo('engine', (.12 + Math.min(1, S.speed / 60) * .5) * (inside ? .6 : 1)); if (AU.engO) { AU.engO.frequency.value = 38 + S.speed * .35; AU.engLP.frequency.value = 160 + S.speed * 8; }
-  for (const pl of SP.plumes) { pl.scale.set(1, .3 + Math.abs(S.thr) * 1.2 + (boost ? .8 : 0), 1); pl.material.opacity = .12 + Math.abs(S.thr) * .2; }
+  loopTo('engine', (.12 + Math.min(1, S.speed / 110) * .5) * (inside ? .6 : 1)); if (AU.engO) { AU.engO.frequency.value = 38 + S.speed * .2; AU.engLP.frequency.value = 160 + S.speed * 5; }
+  for (const pl of SP.plumes) { pl.scale.set(1, .3 + Math.abs(S.thr) * 1.4, 1); pl.material.opacity = .12 + Math.abs(S.thr) * .2; }
   // collisions with rocks and oddities
   const c = new THREE.Vector3(); for (const s of SP.solids) {
-    if (!s.p || s.p.distanceToSquared(S.pos) > 450 * 450) continue; shipAxisClosest(s.p, c); const d = c.distanceTo(s.p), min = s.r + 13;
+    if (!s.p || s.p.distanceToSquared(S.pos) > 1400 * 1400) continue; shipAxisClosest(s.p, c); const d = c.distanceTo(s.p), min = s.r + 22;
     if (d < min) { const n = c.sub(s.p).normalize(); S.pos.addScaledVector(n, min - d); const vn = S.vel.dot(n); if (vn < 0) { const hitSp = -vn; S.vel.addScaledVector(n, -vn * 1.4); if (hitSp > 6 && G.time - (G._hitT || 0) > 1) { G._hitT = G.time; S.hull -= hitSp * .35; sfx('hit', Math.min(1, hitSp / 30)); G.shake = Math.min(1.5, hitSp / 20); UI.toast('Hull impact'); } } }
   }
+  // hull against the big structures
+  for (const st of SP.sites) { if (st.c.distanceTo(S.pos) > 1500) continue; shipAxisClosest(st.c, c); const pt = c.clone(); const before = pt.clone(); if (pushOutBoxes(st.boxes, pt, 24, null)) { const n = pt.clone().sub(before); const L = n.length(); n.normalize(); S.pos.addScaledVector(n, L); const vn = S.vel.dot(n); if (vn < 0) { S.vel.addScaledVector(n, -vn * 1.3); if (-vn > 6 && G.time - (G._hitT || 0) > 1) { G._hitT = G.time; S.hull -= -vn * .3; sfx('hit', Math.min(1, -vn / 30)); G.shake = Math.min(1.5, -vn / 20); UI.toast('Hull impact'); } } } }
   // discover sites
-  for (const s of SP.sites) if (!s.known && s.c.distanceTo(S.pos) < 650) { s.known = true; UI.toast('Found: ' + s.name); sfx('ping'); }
-  if (G.q.stage === 1 && SP.sites[0].c.distanceTo(S.pos) < 330) G.setStage(2);
-  if (G.q.stage === 9 && SP.lighthouse.p.distanceTo(S.pos) < 420) { G.setStage(10); setTimeout(() => lighthouseStory(), 600); }
+  for (const s of SP.sites) if (!s.known && s.c.distanceTo(S.pos) < 1100) { s.known = true; UI.toast('Found: ' + s.name); sfx('ping'); }
+  if (G.q.stage === 1 && SP.sites[0].c.distanceTo(S.pos) < 700) G.setStage(2);
+  if (G.q.stage === 9 && SP.lighthouse.p.distanceTo(S.pos) < 800) { G.setStage(10); setTimeout(() => lighthouseStory(), 600); }
   if (S.hull <= 0 && G.state !== 'over') gameOver();
 }
 function updateGulpers(dt) {
@@ -272,13 +273,21 @@ function updateGulpers(dt) {
     else if (g.state === 'hunt') { target = near; speed = 36 + Math.min(10, g.t * .2); hunted = true; if (d > detect * 1.3) { g.lostT += dt; if (g.lostT > 5) { g.state = 'roam'; g.t = 0; UI.toast('It lost us.'); } } else g.lostT = 0; if (d < 30) { g.state = 'flee'; g.t = 0; g.cool = 25; S.hull -= 14; sfx('hit'); sfx('roar', 1); G.shake = 1.6; S.vel.addScaledVector(near.clone().sub(g.pos).normalize(), 14); UI.toast('Something hit the ship!'); } }
     else { target = g.pos.clone().add(g.pos.clone().sub(S.pos).normalize().multiplyScalar(50)); speed = 26; if (g.t > 8) { g.state = 'roam'; g.t = 0; } }
     const want = target.clone().sub(g.pos); const wl = want.length(); if (wl > .1) want.multiplyScalar(speed / wl); g.vel.lerp(want, Math.min(1, dt * 1.2)); g.pos.addScaledVector(g.vel, dt);
-    // body follows head
-    const segs = g.segs; segs[0].position.copy(g.pos); if (g.vel.lengthSq() > 1) { tmpV.copy(g.pos).sub(g.vel); segs[0].lookAt(tmpV); }
-    for (let k = 1; k < segs.length; k++) { const a = segs[k - 1].position, b = segs[k].position; tmpV.copy(b).sub(a); const l = tmpV.length() || 1; b.copy(a).addScaledVector(tmpV, g.spacing / l); b.y += Math.sin(G.time * 1.8 - k * .5) * .03 * k; segs[k].lookAt(a); segs[k].rotateY(Math.PI); }
+    // body follows the head like a chain, with a travelling side-to-side wave
+    const P = g.pts; P[0].copy(g.pos); const sp = g.vel.length();
+    const side = tmpV.set(-g.vel.z, 0, g.vel.x); if (side.lengthSq() > 1e-4) side.normalize();
+    for (let k = 1; k < P.length; k++) { const a = P[k - 1], b = P[k]; const d0 = b.clone().sub(a); const l = d0.length() || 1; b.copy(a).addScaledVector(d0, g.spacing / l); b.addScaledVector(side, Math.sin(G.time * (1.2 + sp * .05) - k * .55 + g.ph) * .05 * k * Math.min(1, .3 + sp * .04)); }
+    if (!g.g.visible) continue;
+    g.jawOpen = lerp(g.jawOpen, g.state === 'hunt' ? .55 + Math.sin(G.time * 3) * .1 : .08 + Math.sin(G.time * .7 + g.ph) * .05, Math.min(1, dt * 3)); g.jawP.rotation.x = g.jawOpen;
+    g.head.position.copy(P[0]); g.head.lookAt(tmpV.copy(P[0]).multiplyScalar(2).sub(P[1])); g.head.rotateY(Math.PI);
+    g.lure.position.y = 11 + Math.sin(G.time * 2 + g.ph) * .8;
+    gulperMesh(g, G.time);
   }
   G.hunted = hunted;
 }
 function updateWorldAnim(dt, t) {
+  for (const s of SP.sites) if (s.blinkSpin) s.blinkSpin.rotation.y += dt * .1;
+  if (SP.bigRing) SP.bigRing.rotation.z += dt * .025;
   for (const d of SP.decor) { if (d.spin) d.g.rotation.y += d.spin * dt; if (d.g.userData.tick) d.g.userData.tick(t); }
   for (const j of SP.drifters) { const s = 1 + Math.sin(t * 1.4 + j.ph) * .12; j.bell.scale.set(s, 1 / s, s); j.g.position.addScaledVector(j.v, dt); j.g.position.y += Math.sin(t * .7 + j.ph) * .02; }
   const bl = (t * 1.1 % 1) < .12; if (SP.run) SP.run.forEach((g, i) => { const ph = (t * 1.2 - i * .08) % 1; g.material.opacity = ph < .15 ? 1 : .15; }); if (SP.vents) SP.vents.color.setHSL(.05, 1, .45 + Math.sin(t * 1.3) * .06); if (SP.blink) for (const b of SP.blink) b.visible = bl; SP.strobe.visible = (t * .7 % 1) < .05;
@@ -300,7 +309,7 @@ function placeBase(type, pos, ry, src, silent) {
 }
 function nearestSite(p) { let best = null, bd = 1e9; for (const s of SP.sites) { const d = s.c.distanceTo(p); if (d < bd) { bd = d; best = s; } } return [best, bd]; }
 function rayDeposit(o, dir, range) {
-  let best = null, bt = range; for (const s of SP.sites) { if (s.c.distanceTo(o) > 140) continue; for (const d of s.deps) { if (d.amt <= 0) continue; tmpV.copy(d.wp).sub(o); const t = tmpV.dot(dir); if (t < 0 || t > bt + d.r) continue; const dd = tmpV.lengthSq() - t * t; if (dd < d.r * d.r * 1.3) { best = d; bt = t; } } }
+  let best = null, bt = range; for (const s of SP.sites) { if (s.c.distanceTo(o) > 380) continue; for (const d of s.deps) { if (d.amt <= 0) continue; tmpV.copy(d.wp).sub(o); const t = tmpV.dot(dir); if (t < 0 || t > bt + d.r) continue; const dd = tmpV.lengthSq() - t * t; if (dd < d.r * d.r * 1.3) { best = d; bt = t; } } }
   return best;
 }
 function safeZone(p) {
@@ -312,15 +321,17 @@ function updateEVA(dt) {
   const E = G.e; if (!E) return; E.t += dt;
   const [dx, dy] = lookInput(); E.yaw -= dx; E.pitch = clamp(E.pitch - dy, -1.5, 1.5);
   camS.rotation.set(E.pitch, E.yaw, 0); const fwd = new THREE.Vector3(0, 0, -1).applyEuler(camS.rotation), right = new THREE.Vector3(1, 0, 0).applyEuler(camS.rotation);
-  const a = moveAxis(); const boost = IN.hold.run; const acc = (boost ? 14 : 8) * (1 + .25 * G.up.thrust);
+  const a = moveAxis(); const boost = false; const acc = 11 * (1 + .25 * G.up.thrust);
   const th = new THREE.Vector3().addScaledVector(fwd, -a.y).addScaledVector(right, a.x); th.y += (IN.hold.up ? 1 : 0) - (IN.hold.down ? 1 : 0);
   if (th.lengthSq() > 1) th.normalize(); E.vel.addScaledVector(th, acc * dt); E.vel.multiplyScalar(1 - Math.min(1, dt * .9));
-  const maxV = (boost ? 15 : 9) * (1 + .25 * G.up.thrust); if (E.vel.length() > maxV) E.vel.setLength(maxV);
+  const maxV = 12 * (1 + .25 * G.up.thrust); if (E.vel.length() > maxV) E.vel.setLength(maxV);
   E.pos.addScaledVector(E.vel, dt);
   loopTo('jet', th.lengthSq() > .01 ? (boost ? .22 : .12) : 0, .08);
   // collide with rocks and the hull
-  for (const s of SP.sites) { if (s.c.distanceTo(E.pos) > 200) continue; for (const rk of s.rocks) { const d = rk.p.distanceTo(E.pos), m = rk.r + .6; if (d < m) { const n = E.pos.clone().sub(rk.p).normalize(); E.pos.copy(rk.p).addScaledVector(n, m); const vn = E.vel.dot(n); if (vn < 0) E.vel.addScaledVector(n, -vn); } } }
-  { const lp = SP.ship.worldToLocal(E.pos.clone()); for (const b of SP.shipBoxes) { const pad = .5; if (lp.x > b[0] - pad && lp.x < b[3] + pad && lp.y > b[1] - pad && lp.y < b[4] + pad && lp.z > b[2] - pad && lp.z < b[5] + pad) { const o = [lp.x - (b[0] - pad), (b[3] + pad) - lp.x, lp.y - (b[1] - pad), (b[4] + pad) - lp.y, lp.z - (b[2] - pad), (b[5] + pad) - lp.z]; const m = Math.min(...o), i = o.indexOf(m); if (i === 0) lp.x = b[0] - pad; else if (i === 1) lp.x = b[3] + pad; else if (i === 2) lp.y = b[1] - pad; else if (i === 3) lp.y = b[4] + pad; else if (i === 4) lp.z = b[2] - pad; else lp.z = b[5] + pad; E.pos.copy(SP.ship.localToWorld(lp)); E.vel.multiplyScalar(.5); } } }
+  for (const s of SP.sites) { if (s.c.distanceTo(E.pos) > 380) continue; if (pushOutBoxes(s.boxes, E.pos, .6, E.vel)) E.vel.multiplyScalar(.8); for (const rk of s.rocks) { const d = rk.p.distanceTo(E.pos), m = rk.r + .6; if (d < m) { const n = E.pos.clone().sub(rk.p).normalize(); E.pos.copy(rk.p).addScaledVector(n, m); const vn = E.vel.dot(n); if (vn < 0) E.vel.addScaledVector(n, -vn); } } }
+  { const lp0 = SP.ship.worldToLocal(E.pos.clone()); let hitAny = false; for (const b of SP.shipBoxes) { const pad = .5; const rz = b[6] || 0, cz = Math.cos(-rz), sz = Math.sin(-rz); const lp = rz ? new THREE.Vector3(lp0.x * cz - (lp0.y - 3) * sz, lp0.x * sz + (lp0.y - 3) * cz + 3, lp0.z) : lp0.clone(); if (lp.x > b[0] - pad && lp.x < b[3] + pad && lp.y > b[1] - pad && lp.y < b[4] + pad && lp.z > b[2] - pad && lp.z < b[5] + pad) { const o = [lp.x - (b[0] - pad), (b[3] + pad) - lp.x, lp.y - (b[1] - pad), (b[4] + pad) - lp.y, lp.z - (b[2] - pad), (b[5] + pad) - lp.z]; const m = Math.min(...o), i = o.indexOf(m); if (i === 0) lp.x = b[0] - pad; else if (i === 1) lp.x = b[3] + pad; else if (i === 2) lp.y = b[1] - pad; else if (i === 3) lp.y = b[4] + pad; else if (i === 4) lp.z = b[2] - pad; else lp.z = b[5] + pad; if (rz) { const c2 = Math.cos(rz), s2 = Math.sin(rz), y3 = lp.y - 3; lp.set(lp.x * c2 - y3 * s2, lp.x * s2 + y3 * c2 + 3, lp.z); } lp0.copy(lp); hitAny = true; E.vel.multiplyScalar(.5); } }
+    { const rl = lp0.clone().sub(new THREE.Vector3(0, 3, 470)); const q = Math.hypot(rl.x, rl.y), d2 = Math.hypot(q - 250, rl.z); if (d2 < 17 && q > 1) { const n = new THREE.Vector3(rl.x / q * (q - 250), rl.y / q * (q - 250), rl.z).normalize(); const fix = n.multiplyScalar(17); const base = new THREE.Vector3(rl.x / q * 250, rl.y / q * 250, 0); lp0.copy(base.add(fix)).add(new THREE.Vector3(0, 3, 470)); hitAny = true; } }
+    if (hitAny) E.pos.copy(SP.ship.localToWorld(lp0)); }
   camS.position.copy(E.pos); camS.position.y += Math.sin(E.t * 1.3) * .03;
   SP.suitLamp.position.copy(camS.position).addScaledVector(right, .3).y -= .2; SP.suitLamp.target.position.copy(camS.position).addScaledVector(fwd, 10);
   // fog thickens around you outside
@@ -381,9 +392,12 @@ function updatePale(dt, E, fwd, prox) {
   else { P.safeT = 0; P.pos.addScaledVector(toP, speed * dt); if (d > 120) { const a = Math.random() * TAU; P.pos.copy(E.pos).add(new THREE.Vector3(Math.cos(a) * 75, 0, Math.sin(a) * 75)); } if (d < 2.4) G.caught(); }
   // look and move like something wrong
   g.position.copy(P.pos); g.position.y += Math.sin(P.t * .9) * .25 - 2.4; g.lookAt(E.pos.x, g.position.y, E.pos.z);
-  P.head.rotation.z = Math.sin(P.t * .4) * .25 + (seen && Math.random() < .08 ? (Math.random() - .5) * 1.2 : 0); P.head.rotation.x = -.2;
-  P.armL.sh.rotation.x = Math.sin(P.t * .7) * .15 - (d < 12 ? .9 : 0); P.armR.sh.rotation.x = Math.sin(P.t * .6 + 1) * .15 - (d < 12 ? .9 : 0); P.armL.el.rotation.x = P.armR.el.rotation.x = d < 12 ? -.4 : 0;
-  P.mouth.scale.y = 2.8 + (d < 15 ? (15 - d) * .5 : 0);
+  // animation: slow wrong walk, stops dead and twitches when looked at, reaches out when close
+  const want = seen ? 'idle' : (d < 10 ? 'sad_pose' : 'walk');
+  if (P.cur !== want && P.act[want]) { const a = P.act[want], o = P.act[P.cur]; a.reset(); a.play(); if (o) a.crossFadeFrom(o, seen ? .15 : .9, true); P.cur = want; }
+  P.act.walk.timeScale = .25 + speed * .06;
+  P.mixer.update(dt);
+  if (P.head) { g.updateMatrixWorld(true); const fw = new THREE.Vector3(0, 0, 1).applyQuaternion(g.quaternion); P.tw = seen && Math.random() < .1 ? (Math.random() - .5) * 1.6 : (P.tw || 0) * .85; turnBone(P.head, fw, Math.sin(P.t * .4) * .35 + P.tw); }
   SP.monLight.position.copy(g.position).y += 3; SP.monLight.intensity = 3 + prox * 6;
   // fear
   $('#vign').style.opacity = (prox * .95).toFixed(3);
@@ -404,13 +418,15 @@ function openBuildMenu() {
 }
 function updateBuild(dt, fwd) {
   if (!ghost) { G.building = false; G.refreshTouch(); return; }
-  const E = G.e; const def = BUILD[ghostType]; const p = E.pos.clone().addScaledVector(fwd, G.ghostDist || 7);
+  const E = G.e; const def = BUILD[ghostType]; let p = E.pos.clone().addScaledVector(fwd, G.ghostDist || 7);
+  // aim at a structure or rock within reach and the part sits on its surface
+  { const [st, sd] = nearestSite(E.pos); if (st && sd < 400) { if (!G._ray) G._ray = new THREE.Raycaster(); const rc = G._ray; rc.set(E.pos, fwd); rc.far = 16; const hits = rc.intersectObjects(st.surf.concat(SP.rockIMs || []), false); if (hits[0]) { const h = hits[0]; const n = h.face ? h.face.normal.clone().transformDirection(h.object.matrixWorld) : fwd.clone().negate(); if (h.instanceId !== undefined) { const m4 = new THREE.Matrix4(); h.object.getMatrixAt(h.instanceId, m4); n.copy(h.face.normal).transformDirection(m4); } p = h.point.clone().addScaledVector(n, .6); G.ghostSnap = true; } else G.ghostSnap = false; } }
   if (IN.hold.up && G.mode === 'mobile') { } // up/down move the suit while building
-  const snap = def.id === 'floor' || def.id === 'wall' ? 2 : .5; p.set(Math.round(p.x / snap) * snap, Math.round(p.y / snap) * snap, Math.round(p.z / snap) * snap);
+  const snap = G.ghostSnap ? .01 : def.id === 'floor' || def.id === 'wall' ? 2 : .5; p.set(Math.round(p.x / snap) * snap, Math.round(p.y / snap) * snap, Math.round(p.z / snap) * snap);
   ghost.position.copy(p); ghost.rotation.y = ghostRot;
   if (IN.take('rot')) { ghostRot += Math.PI / 2; sfx('ui'); }
   let ok = G.canPay(def.cost), why = ok ? '' : 'Not enough materials';
-  const [site, sd] = nearestSite(p); if (def.id === 'extractor' && sd > 110) { ok = false; why = 'Extractors must be built near a site'; }
+  const [site, sd] = nearestSite(p); if (def.id === 'extractor' && sd > 320) { ok = false; why = 'Extractors must be built near a site'; }
   const mat = ok ? modMats().ghostOk : modMats().ghostNo; ghost.traverse(o => { if (o.isMesh) o.material = mat; });
   if (why) UI.warn(why); else UI.warn('');
   if (IN.take('fire') || IN.take('use')) {
@@ -495,7 +511,7 @@ function frame(now) {
   // HUD
   UI.res();
   if (st === 'ship') UI.bars([['Health', G.p.hp / 100, Math.round(G.p.hp)], ['Hull', G.ship.hull / G.ship.hullMax, Math.round(G.ship.hull)]]);
-  if (st === 'helm') { UI.bars([['Hull', G.ship.hull / G.ship.hullMax, Math.round(G.ship.hull)], ['Speed', G.ship.speed / 78, Math.round(G.ship.speed) + ' m/s', '#c8d8dc'], ['Noise', clamp(G.noise / 1.2, 0, 1), G.noise > .8 ? 'LOUD' : G.noise > .4 ? 'Medium' : 'Quiet', G.noise > .8 ? '#e07a6a' : G.noise > .4 ? '#e0b060' : '#80c890']]); drawMap(); $('#cross').classList.toggle('hidden', G.view === 'out'); }
+  if (st === 'helm') { UI.bars([['Hull', G.ship.hull / G.ship.hullMax, Math.round(G.ship.hull)], ['Speed', G.ship.speed / 110, Math.round(G.ship.speed) + ' m/s', '#c8d8dc'], ['Noise', clamp(G.noise / 1.2, 0, 1), G.noise > .8 ? 'LOUD' : G.noise > .4 ? 'Medium' : 'Quiet', G.noise > .8 ? '#e07a6a' : G.noise > .4 ? '#e0b060' : '#80c890']]); drawMap(); $('#cross').classList.toggle('hidden', G.view === 'out'); }
   if (st === 'eva' && G.e) UI.bars([['Oxygen', G.e.o2 / G.o2Max(), Math.round(G.e.o2 / G.o2Max() * 100) + '%'], ['Health', G.p.hp / 100, Math.round(G.p.hp)], ['Cargo', G.cargoN() / G.cargoMax(), G.cargoN() + '/' + G.cargoMax(), '#c8d8dc'], ['Flares', Math.min(1, G.p.flares / 6), G.p.flares, '#ff9a6a']]);
   // render
   let shake = G.shake || 0; G.shake = Math.max(0, shake - dt * 1.5);
@@ -507,13 +523,13 @@ function frame(now) {
     // the view outside through the windows
     SP.ship.updateMatrixWorld(); camS.position.copy(camI.position).applyMatrix4(SP.ship.matrixWorld); SP.ship.getWorldQuaternion(tmpQ); camS.quaternion.copy(tmpQ).multiply(camI.quaternion);
     SP.scene.fog.density = .00008;
-    SP.ship.visible = false; SP.suitLamp.intensity = 0; updateDust(camS.position, 160); renderSpace(); SP.ship.visible = true;
+    for (const o of SP.habParts) o.visible = false; SP.suitLamp.intensity = 0; updateDust(camS.position, 160); renderSpace(); for (const o of SP.habParts) o.visible = true;
     R.clearDepth(); R.render(INT.scene, camI);
   } else if (st === 'helm') {
-    const S = G.ship; const yaw = S.yaw + (G.camYaw || 0); const dist = 330, pitch = G.camPitch; const back = new THREE.Vector3(Math.sin(S.yaw), 0, Math.cos(S.yaw));
-    const target = S.pos.clone().addScaledVector(back, 105); target.y += 8;
+    const S = G.ship; const yaw = S.yaw + (G.camYaw || 0); const dist = 1250, pitch = G.camPitch; const back = new THREE.Vector3(Math.sin(S.yaw), 0, Math.cos(S.yaw));
+    const target = S.pos.clone().addScaledVector(back, 420); target.y += 20;
     const want = target.clone().add(new THREE.Vector3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), Math.cos(yaw) * Math.cos(pitch)).multiplyScalar(dist));
-    if (!G._camInit) { camS.position.copy(want); G._camInit = true; } camS.position.lerp(want, Math.min(1, dt * 3)); camS.lookAt(target.clone().addScaledVector(back, -50));
+    if (!G._camInit) { camS.position.copy(want); G._camInit = true; } camS.position.lerp(want, Math.min(1, dt * 3)); camS.lookAt(target.clone().addScaledVector(back, -150));
     if (shake) camS.position.add(new THREE.Vector3((Math.random() - .5) * shake * 2, (Math.random() - .5) * shake * 2, 0));
     SP.scene.fog.density = .00008; updateDust(camS.position, 160); renderSpace();
   } else if (st === 'eva') {
@@ -523,22 +539,25 @@ function frame(now) {
 }
 
 function renderSpace() {
-  const c = camS.position, eva = G.state === 'eva', range = eva ? 380 : 4200; const far = eva ? 1200 : 9000;
+  const c = camS.position, eva = G.state === 'eva', range = eva ? 520 : 6000; const far = eva ? 1200 : 9000;
   if (camS.far !== far) { camS.far = far; camS.updateProjectionMatrix(); }
-  SP.dome.scale.setScalar(far * .92); SP.dome.material.uniforms.fm.value = eva ? .93 : 0; SP.bubble.visible = !eva;
+  SP.dome.scale.setScalar(far * .92); SP.dome.material.uniforms.fm.value = eva ? 1 : 0; SP.bubble.material.uniforms.eva.value = eva ? 1 : 0;
   SP.bubble.material.uniforms.cam.value.copy(c); SP.bubble.material.uniforms.t.value = G.time;
   for (const d of SP.decor) d.g.visible = d.p.distanceTo(c) < range + d.r;
-  for (const s of SP.sites) s.group.visible = s.c.distanceTo(c) < (eva ? range : 2200) + 120;
+  for (const s of SP.sites) s.group.visible = s.c.distanceTo(c) < (eva ? range : 4000) + 200;
   for (const g of SP.gulpers) g.g.visible = g.pos.distanceTo(c) < range + 200;
   for (const j of SP.drifters) j.g.visible = j.g.position.distanceTo(c) < range;
   for (const b of G.bases || []) b.g.visible = b.pos.distanceTo(c) < (eva ? range : 1500);
-  SP.dome.position.copy(c); R.render(SP.scene, camS);
+  SP.dome.position.copy(c);
+  { const m = SP.bubble.material, bl = eva ? THREE.NormalBlending : THREE.AdditiveBlending; if (m.blending !== bl) { m.blending = bl; m.needsUpdate = true; } }
+  R.render(SP.scene, camS);
 }
 // ---------- boot ----------
-function boot() {
+async function boot() {
   try { const s = JSON.parse(localStorage.getItem('thedepths-settings')); if (s) Object.assign(G.set, s); else G.set.gfx = 'high'; G.set.mode = 'mobile'; } catch (e) { }
   initRenderer();
   makeTextures(G.set.gfx !== 'low');
+  await loadModels();
   buildInterior(); buildNPCs(); buildSpace();
   INT.outerDoor.want = 0; INT.innerDoor.want = 0;
   G.newState(); G.applySettings(); setupTouch();
@@ -549,4 +568,5 @@ function boot() {
   document.addEventListener('visibilitychange', () => { if (document.hidden) { G.save(); if (AU.ctx) AU.ctx.suspend(); } else if (AU.ctx && G.inPlay()) AU.ctx.resume(); });
   addEventListener('pagehide', () => G.save());
 }
-setTimeout(boot, 30);
+setTimeout(() => boot().catch(e => { $('#load').textContent = 'COULD NOT START: ' + e.message; console.error(e); }), 30);
+if (location.protocol.startsWith('http') && 'serviceWorker' in navigator) navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(() => { });
