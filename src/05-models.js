@@ -3,12 +3,16 @@ const MD = {};
 function b64ToBuf(s) { const bin = atob(s); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; }
 async function loadModels() {
   const L = new THREE.GLTFLoader(); const P = k => new Promise((res, rej) => L.parse(b64ToBuf(MODEL_DATA[k]), '', res, rej));
-  MD.rpm = await P('rpm'); MD.michelle = await P('michelle'); MD.xbot = await P('xbot');
-  tposeRig(MD.rpm.scene);
+  MD.crew = await P('crew'); MD.anims = await P('anims'); MD.michelle = await P('michelle'); MD.xbot = await P('xbot');
+  { // the loader renames repeated bone names (thigh_l_1 ...); give every part's bones their real names back so clips and hair find them
+    const real = new Set(); crewScene('body_Male').traverse(c => { if (c.isBone) real.add(c.name); });
+    for (const s of MD.crew.scenes) s.traverse(c => { if (c.isBone && !real.has(c.name)) { const n = c.name.replace(/_\d+$/, ''); if (real.has(n)) c.name = n; } }); }
+  MD.crewClips = {}; for (const c of MD.anims.animations) MD.crewClips[c.name] = c;
+  MD.mask = {}; for (const s of ['Male', 'Female']) { const im = new Image(); im.src = CREW_MASK[s]; await im.decode(); MD.mask[s] = im; }
   MD.clips = {}; for (const c of MD.xbot.animations) MD.clips[c.name] = c;
   // the crew rigs have different bone rolls, so bake each animation onto them through world space
   const want = ['idle', 'walk', 'agree', 'headShake', 'sad_pose'];
-  for (const k of ['rpm', 'michelle']) { MD[k].clips = {}; for (const n of want) MD[k].clips[n] = retargetClip(MD.xbot.scene, MD.clips[n], MD[k].scene, MD[k].animations); }
+  for (const k of ['michelle']) { MD[k].clips = {}; for (const n of want) MD[k].clips[n] = retargetClip(MD.xbot.scene, MD.clips[n], MD[k].scene, MD[k].animations); }
 }
 // the second crew rig rests in an A-pose; lift its arms out level so it matches the others
 function tposeRig(root) {
@@ -94,48 +98,42 @@ function makeHair(style, col) {
   if (style === 'bun') { const b = new THREE.Mesh(new THREE.SphereGeometry(.48, 20, 14), mat); b.position.set(0, .72, -.78); g.add(b); }
   return g;
 }
-function makeCrew(o) {
-  const src = o.female ? MD.michelle : MD.rpm; const m = THREE.SkeletonUtils.clone(src.scene);
-  m.traverse(c => { if (!c.isMesh) return; c.frustumCulled = false; const mt = c.material = c.material.clone(); mt.envMapIntensity = 1; const n = mt.name;
-    if (o.female) { mt.metalness = 0; mt.specularColorMap = null; if (mt.specularColor) mt.specularColor.setRGB(1, 1, 1); // one atlas: trousers (yellow), skin (brown), trims (red), hair (near black)
-      if (mt.map) { const [pr, pg, pb] = hexRGB(o.pants), [ar, ag, ab] = hexRGB(o.trim), [sr, sg, sb] = hexRGB(o.skin), [hr, hg, hb] = hexRGB(o.hair || 0x222222);
-        mt.map = repaint(mt.map, (r, g, b) => { const [h, s, v] = hsv(r, g, b);
-          if (h > 38 && h < 75 && s > .35 && v > .35) { const l = v * 1.1; return [pr * l, pg * l, pb * l]; }
-          if ((h < 14 || h > 335) && s > .55 && v > .3) { const l = v * 1.2; return [ar * l, ag * l, ab * l]; }
-          if (h >= 8 && h <= 38 && s > .2 && s < .75 && v > .12) { const l = v / .45; return [Math.min(1, sr * l), Math.min(1, sg * l), Math.min(1, sb * l)]; }
-          if (h > 150 && h < 260 && s > .18 && v > .05) { const l = Math.max(.35, v * 1.1); return [.62 * l, .36 * l, .36 * l]; }
-          if (v < .2 && s < .5) { const l = v / .12; return [Math.min(1, hr * l), Math.min(1, hg * l), Math.min(1, hb * l)]; }
-          return null; }); }
-    } else {
-      if (n === 'Wolf3D_Outfit_Top' && mt.map) mt.map = dye(mt.map, o.top, 1.6, .7);
-      else if (n === 'Wolf3D_Outfit_Bottom' && mt.map) mt.map = dye(mt.map, o.bottom, 1.6, .5);
-      else if (n === 'Wolf3D_Outfit_Footwear' && mt.map) mt.map = dye(mt.map, o.shoes || 0x2a2a2a, 1.3);
-      else if (n === 'Wolf3D_Skin' || n === 'Wolf3D_Body') mt.color.set(o.skin);
-      else if (n === 'Wolf3D_Headwear') c.visible = false; // a hat; hair is added below
-      else if (n === 'Wolf3D_Beard') { mt.color.set(o.hair); c.visible = !!o.beard; }
-    } });
-  if (o.female && o.style) m.traverse(c => { if (!c.isSkinnedMesh) return; c.geometry = baldHead(c, true); const S = c.geometry.userData.skull, BI = c.skeleton.boneInverses[S.hi], head = c.skeleton.bones[S.hi];
-    const hg = makeHair(o.style, o.hair), sc = new THREE.Vector3(); BI.decompose(new THREE.Vector3(), new THREE.Quaternion(), sc);
-    const up = S.up.clone().transformDirection(BI), fr = S.front.clone().transformDirection(BI), rt = up.clone().cross(fr).normalize(); fr.crossVectors(rt, up).normalize();
-    hg.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(rt, up, fr)); hg.position.copy(S.C.clone().applyMatrix4(BI)); hg.scale.set(S.RS[0] * sc.x, S.RS[1] * sc.x, S.RS[2] * sc.x); head.add(hg); });
-  if (!o.female && !o.bald) { // short hair: a thin shell fitted to the top of the skull, following the head bone
-    m.updateMatrixWorld(true); let hm = null; m.traverse(c => { if (c.isMesh && c.material.name === 'Wolf3D_Skin') hm = c; });
-    const pa = hm.geometry.attributes.position, v = new THREE.Vector3(), pts = []; let y0 = 1e9, y1 = -1e9;
-    for (let i = 0; i < pa.count; i++) { v.fromBufferAttribute(pa, i).applyMatrix4(hm.matrixWorld); pts.push(v.clone()); y0 = Math.min(y0, v.y); y1 = Math.max(y1, v.y); }
-    const hy = y1 - (y1 - y0) * .24, bb = new THREE.Box3(); for (const p of pts) if (p.y > hy) bb.expandByPoint(p);
-    const rx = (bb.max.x - bb.min.x) / 2, rz = (bb.max.z - bb.min.z) / 2, R = Math.max(rx, rz), ry = (y1 - hy) * 1.0;
-    const c = new THREE.Vector3((bb.min.x + bb.max.x) / 2, y1 - ry, (bb.min.z + bb.max.z) / 2);
-    const head = boneByName(m, 'Head'); const ws = head.getWorldScale(new THREE.Vector3());
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 18, 0, TAU, 0, o.long ? 2.0 : 1.62), new THREE.MeshStandardMaterial({ color: o.hair, roughness: .9 }));
-    // the shell sits lower at the back than the front (a hairline)
-    const g2 = new THREE.Group(); g2.position.copy(head.worldToLocal(c.clone())); head.add(g2); g2.quaternion.copy(head.getWorldQuaternion(new THREE.Quaternion()).invert());
-    cap.scale.set(rx * 1.07 / ws.x, ry * 1.08 / ws.y, rz * 1.07 / ws.z); cap.rotation.x = -.3 * (rigYaw(m) ? -1 : 1); cap.position.z = 0; g2.add(cap);
+// a crew member: base body + hairstyle, dressed in a ship jumpsuit painted over the body (mask: red body, green shoulders, blue boots)
+function crewScene(name) { return MD.crew.scenes.find(s => s.name === name); }
+function crewTex(mt, o, mask) {
+  const im = mt.map.image, W = im.width, H = im.height; const c = document.createElement('canvas'); c.width = W; c.height = H; const x = c.getContext('2d');
+  x.drawImage(im, 0, 0, W, H); const T = x.getImageData(0, 0, W, H); x.filter = 'blur(' + (W / 512) + 'px)'; x.drawImage(mask, 0, 0, W, H); x.filter = 'none'; const M = x.getImageData(0, 0, W, H);
+  const t = T.data, m = M.data, sk = hexRGB(o.skin), A = hexRGB(o.suit), B = hexRGB(o.accent), Bt = hexRGB(o.boots || 0x1c1d20);
+  const ref = [.93, .72, .58]; // the light skin the texture was painted with
+  for (let i = 0; i < t.length; i += 4) {
+    const r = t[i] / 255, g = t[i + 1] / 255, b = t[i + 2] / 255, lum = r * .3 + g * .59 + b * .11;
+    const wr = m[i] / 255, wg = m[i + 1] / 255, wb = m[i + 2] / 255, ws = Math.min(1, wr + wg + wb);
+    const sr = Math.min(1, r * sk[0] / ref[0]), sg = Math.min(1, g * sk[1] / ref[1]), sb = Math.min(1, b * sk[2] / ref[2]);
+    const tot = wr + wg + wb || 1, d = .86 + (lum - .62) * .45; // keep a little of the body shading as cloth folds
+    const cr = (A[0] * wr + B[0] * wg + Bt[0] * wb) / tot * d, cg = (A[1] * wr + B[1] * wg + Bt[1] * wb) / tot * d, cb = (A[2] * wr + B[2] * wg + Bt[2] * wb) / tot * d;
+    t[i] = (sr * (1 - ws) + cr * ws) * 255; t[i + 1] = (sg * (1 - ws) + cg * ws) * 255; t[i + 2] = (sb * (1 - ws) + cb * ws) * 255;
   }
-  m.rotation.y = -rigYaw(m); const g = new THREE.Group(); g.add(m); fitHeight(m, 1.76 * (o.tall || 1)); if (o.wide) { m.scale.x *= o.wide; m.scale.z *= o.wide; }
-  const mixer = new THREE.AnimationMixer(m); const act = {};
-  for (const k in src.clips) act[k] = mixer.clipAction(src.clips[k]);
+  x.putImageData(T, 0, 0); const out = new THREE.CanvasTexture(c); out.flipY = mt.map.flipY; out.colorSpace = THREE.SRGBColorSpace; out.anisotropy = 4;
+  let nrm = mt.normalMap; if (nrm) { const n2 = document.createElement('canvas'); n2.width = W; n2.height = H; const y = n2.getContext('2d'); y.drawImage(nrm.image, 0, 0, W, H); const N = y.getImageData(0, 0, W, H), n = N.data;
+    for (let i = 0; i < n.length; i += 4) { const ws = Math.min(1, (m[i] + m[i + 1] + m[i + 2]) / 255) * .75; n[i] += (128 - n[i]) * ws; n[i + 1] += (128 - n[i + 1]) * ws; n[i + 2] += (255 - n[i + 2]) * ws; }
+    y.putImageData(N, 0, 0); nrm = new THREE.CanvasTexture(n2); nrm.flipY = mt.normalMap.flipY; nrm.colorSpace = THREE.NoColorSpace; }
+  return [out, nrm];
+}
+function makeCrew(o) {
+  const sex = o.female ? 'Female' : 'Male'; const m = THREE.SkeletonUtils.clone(crewScene('body_' + sex));
+  let body = null; m.traverse(c => { if (c.isSkinnedMesh) { c.frustumCulled = false; c.material = c.material.clone(); if (/Superhero/i.test(c.material.name)) body = c; if (/Hair/.test(c.material.name)) c.material.color.set(o.hair); } });
+  const [map, nrm] = crewTex(body.material, o, MD.mask[sex]); body.material.map = map; if (nrm) body.material.normalMap = nrm; body.material.roughness = .8;
+  // hair and beard: separate skinned meshes, re-bound to this body's bones
+  const bones = {}; m.traverse(c => { if (c.isBone) bones[c.name] = c; });
+  for (const hk of [o.style, o.beard ? 'Hair_Beard' : null]) { if (!hk) continue; const hs = THREE.SkeletonUtils.clone(crewScene(hk));
+    hs.traverse(c => { if (!c.isSkinnedMesh) return; const sk = new THREE.Skeleton(c.skeleton.bones.map(b => bones[b.name] || b), c.skeleton.boneInverses); c.material = c.material.clone(); c.material.color.set(o.hair); c.frustumCulled = false;
+      const mesh = new THREE.SkinnedMesh(c.geometry, c.material); mesh.bind(sk, c.bindMatrix); body.parent.add(mesh); }); }
+  m.updateMatrixWorld(true); const l = bones.thigh_l.getWorldPosition(new THREE.Vector3()).x, r = bones.thigh_r.getWorldPosition(new THREE.Vector3()).x;
+  m.rotation.y = l > r ? 0 : Math.PI; const g = new THREE.Group(); g.add(m); fitHeight(m, (o.female ? 1.68 : 1.8) * (o.tall || 1)); if (o.wide) { m.scale.x *= o.wide; m.scale.z *= o.wide; }
+  const mixer = new THREE.AnimationMixer(m); const act = {}; const C = MD.crewClips;
+  for (const [k, n] of [['idle', 'Idle_Loop'], ['walk', 'Walk_Loop'], ['agree', 'Idle_Talking_Loop'], ['headShake', 'Idle_Talking_Loop'], ['fix', 'Fixing_Kneeling']]) if (C[n]) act[k] = mixer.clipAction(C[n]);
   act.walk.timeScale = .9; act.idle.play(); act.idle.time = Math.random() * 4; act.idle.timeScale = .85 + Math.random() * .3;
-  return { g, model: m, mixer, act, head: boneByName(m, 'Head'), cur: 'idle' };
+  return { g, model: m, mixer, act, head: bones.Head, cur: 'idle' };
 }
 function crewPlay(P, name, fade = .4) { if (P.cur === name || !P.act[name]) return; const a = P.act[name], b = P.act[P.cur]; a.reset(); a.setEffectiveWeight(1); a.play(); if (b) a.crossFadeFrom(b, fade, true); P.cur = name; }
 // smooth the head into a bare skull: pull every head vertex outside a sphere back onto it
