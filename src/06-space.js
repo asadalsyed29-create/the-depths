@@ -421,9 +421,10 @@ function buildCreatures() {
   const bone = new THREE.MeshStandardMaterial({ color: 0xd8cfb8, roughness: .4 });
   const mouthM = new THREE.MeshStandardMaterial({ color: 0x2a0e10, roughness: .8, side: THREE.DoubleSide });
   const r = rng(99);
-  for (let i = 0; i < 6; i++) {
+  const K = 3.2; // they are big enough to wrap around a ship
+  for (let i = 0; i < 12; i++) {
     const g = new THREE.Group(); SP.scene.add(g);
-    const NP = 18, spacing = 8.5, RINGS = 64, SIDES = 16, len = (NP - 1) * spacing;
+    const NP = 18, spacing = 8.5 * K, RINGS = 64, SIDES = 16, len = (NP - 1) * spacing;
     const pts = []; const home = inBubble(r, 1000);
     for (let k = 0; k < NP; k++) pts.push(home.clone().add(new THREE.Vector3(0, 0, k * spacing)));
     // tube geometry, rewritten every frame
@@ -432,13 +433,13 @@ function buildCreatures() {
     const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); geo.setIndex(idx);
     const body = new THREE.Mesh(geo, skin); body.frustumCulled = false; g.add(body);
     // radius along the body (0 = head end): thick neck, long taper, thin whip tail
-    const prof = u => { const head = u < .08 ? lerp(6.5, 9, u / .08) : 9 * Math.pow(1 - (u - .08) / .92, .85) + .5; return head * (1 + .08 * Math.sin(u * 60)); };
+    const prof = u => { const head = u < .08 ? lerp(6.5, 9, u / .08) : 9 * Math.pow(1 - (u - .08) / .92, .85) + .5; return K * head * (1 + .08 * Math.sin(u * 60)); };
     // glowing spots along the flanks
     const SPOTS = 70, spPos = new Float32Array(SPOTS * 3), spot = []; for (let k = 0; k < SPOTS; k++) spot.push([.1 + (k >> 1) / (SPOTS / 2) * .8, (k & 1 ? .27 : .73) + (r() - .5) * .04]);
     const spG = new THREE.BufferGeometry(); spG.setAttribute('position', new THREE.BufferAttribute(spPos, 3));
-    const spots = new THREE.Points(spG, new THREE.PointsMaterial({ map: glowTex(), color: 0x7affe0, size: 3.2, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })); spots.frustumCulled = false; g.add(spots);
+    const spots = new THREE.Points(spG, new THREE.PointsMaterial({ map: glowTex(), color: 0x7affe0, size: 3.2 * K, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })); spots.frustumCulled = false; g.add(spots);
     // head: skull, hinged jaw, teeth, eyes, lure
-    const head = new THREE.Group(); g.add(head);
+    const head = new THREE.Group(); head.scale.setScalar(K); g.add(head);
     const skull = new THREE.Mesh(new THREE.SphereGeometry(9, 28, 18), skin); skull.scale.set(1.05, .78, 1.55); skull.position.set(0, 1.5, -5); head.add(skull);
     const brow = new THREE.Mesh(new THREE.SphereGeometry(4, 16, 10), skin); brow.scale.set(2.1, .6, 1.4); brow.position.set(0, 6, -9); head.add(brow);
     const jawP = new THREE.Group(); jawP.position.set(0, -1, 4); head.add(jawP);
@@ -455,7 +456,7 @@ function buildCreatures() {
     const lure = new THREE.Mesh(new THREE.SphereGeometry(1.3, 14, 10), new THREE.MeshBasicMaterial({ color: 0xc8fff0 })); lure.position.set(0, 11, -25); head.add(lure); const lg = glow(0x9affe0, 26, .9); lure.add(lg);
     // tail fin
     const finS = new THREE.Shape(); finS.moveTo(0, 0); finS.quadraticCurveTo(6, 4, 14, 9); finS.quadraticCurveTo(9, 0, 14, -9); finS.quadraticCurveTo(6, -4, 0, 0);
-    const fin = new THREE.Mesh(new THREE.ShapeGeometry(finS, 12), new THREE.MeshStandardMaterial({ map: skinTex, color: 0x9ab0a8, roughness: .6, side: THREE.DoubleSide, transparent: true, opacity: .85 })); fin.rotation.y = -Math.PI / 2; const tail = new THREE.Group(); tail.add(fin); g.add(tail);
+    const fin = new THREE.Mesh(new THREE.ShapeGeometry(finS, 12), new THREE.MeshStandardMaterial({ map: skinTex, color: 0x9ab0a8, roughness: .6, side: THREE.DoubleSide, transparent: true, opacity: .85 })); fin.rotation.y = -Math.PI / 2; const tail = new THREE.Group(); tail.scale.setScalar(K); tail.add(fin); g.add(tail);
     const G2 = { g, pts, spacing, len, NP, RINGS, SIDES, geo, prof, spot, spG, head, jawP, tail, home, pos: home.clone(), vel: new THREE.Vector3(), state: 'roam', t: 0, wp: home.clone(), lure, lostT: 0, cool: 0, jawOpen: 0, ph: r() * 10 };
     SP.gulpers.push(G2); gulperMesh(G2, 0);
   }

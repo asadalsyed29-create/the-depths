@@ -144,7 +144,7 @@ const G = {
     fade(() => {
       this.state = 'eva'; this.evaCount++; setMood('eva'); const E = this.e = { pos: SP.ship.localToWorld(SP.airlockLocal.clone()), vel: new THREE.Vector3(), yaw: this.ship.yaw - Math.PI / 2, pitch: 0, o2: this.o2Max(), t: 0, mineT: 0, breathT: 0, heartT: 0, flares: [], warnT: 0 };
       E.vel.set(Math.cos(this.ship.yaw), 0, -Math.sin(this.ship.yaw)).multiplyScalar(2);
-      G.flares = []; const P = SP.pale; P.on = false; P.spawnAt = Math.max(16, 38 - this.evaCount * 3) + Math.random() * 12; P.state = 'none';
+      G.flares = []; const P = SP.pale; P.on = false; P.spawnAt = Math.max(8, 18 - this.evaCount * 2) + Math.random() * 8; P.state = 'none';
       SP.suitLamp.intensity = this.up.lamp ? 20 : 13; $('#cross').classList.remove('hidden'); $('#compass').classList.remove('hidden'); $('#map').classList.add('hidden');
       loopTo('wind', .25, 1); this.refreshTouch(); if (this.q.stage === 2) this.setStage(3);
       UI.toast(this.mode === 'pc' ? 'Hold the left mouse button on glowing rocks to mine. B to build.' : 'Hold Use on glowing rocks to mine. Build to place base parts.', 4000);
@@ -266,11 +266,11 @@ function updateGulpers(dt) {
   const S = G.ship; let hunted = false; const near = new THREE.Vector3();
   for (const g of SP.gulpers) {
     g.t += dt; g.cool -= dt; shipAxisClosest(g.pos, near); const d = near.distanceTo(g.pos);
-    const detect = (110 + 560 * (G.noise || 0)) * (G.state === 'eva' ? .3 : 1);
+    const detect = (260 + 700 * (G.noise || 0)) * (G.state === 'eva' ? .3 : 1);
     let target, speed;
-    if (g.state === 'roam') { if (g.t > 25 || g.pos.distanceTo(g.wp) < 30) { g.t = 0; g.wp.copy(g.home).add(new THREE.Vector3((Math.random() - .5) * 700, (Math.random() - .5) * 120, (Math.random() - .5) * 700)); } target = g.wp; speed = 10; if (d < detect && g.cool <= 0 && G.inPlay()) { g.state = 'hunt'; g.lostT = 0; if (d < 900) sfx('roar', .7); } }
-    else if (g.state === 'hunt') { target = near; speed = 36 + Math.min(10, g.t * .2); hunted = true; if (d > detect * 1.3) { g.lostT += dt; if (g.lostT > 5) { g.state = 'roam'; g.t = 0; UI.toast('It lost us.'); } } else g.lostT = 0; if (d < 30) { g.state = 'flee'; g.t = 0; g.cool = 25; S.hull -= 14; sfx('hit'); sfx('roar', 1); G.shake = 1.6; S.vel.addScaledVector(near.clone().sub(g.pos).normalize(), 14); UI.toast('Something hit the ship!'); } }
-    else { target = g.pos.clone().add(g.pos.clone().sub(S.pos).normalize().multiplyScalar(50)); speed = 26; if (g.t > 8) { g.state = 'roam'; g.t = 0; } }
+    if (g.state === 'roam') { if (g.t > 22 || g.pos.distanceTo(g.wp) < 60) { g.t = 0; const stalk = Math.random() < .55; g.wp.copy(stalk ? S.pos : g.home).add(new THREE.Vector3((Math.random() - .5) * (stalk ? 900 : 1400), (Math.random() - .5) * (stalk ? 500 : 900), (Math.random() - .5) * (stalk ? 900 : 1400))); } target = g.wp; speed = 22; if (d < detect && g.cool <= 0 && G.inPlay()) { g.state = 'hunt'; g.lostT = 0; if (d < 1600) sfx('roar', .7); } }
+    else if (g.state === 'hunt') { target = near; speed = 60 + Math.min(25, g.t * .5); hunted = true; if (d > detect * 1.3) { g.lostT += dt; if (g.lostT > 5) { g.state = 'roam'; g.t = 0; UI.toast('It lost us.'); } } else g.lostT = 0; if (d < 75) { g.state = 'flee'; g.t = 0; g.cool = 25; S.hull -= 14; sfx('hit'); sfx('roar', 1); G.shake = 1.6; S.vel.addScaledVector(near.clone().sub(g.pos).normalize(), 14); UI.toast('Something hit the ship!'); } }
+    else { target = g.pos.clone().add(g.pos.clone().sub(S.pos).normalize().multiplyScalar(50)); speed = 40; if (g.t > 8) { g.state = 'roam'; g.t = 0; } }
     const want = target.clone().sub(g.pos); const wl = want.length(); if (wl > .1) want.multiplyScalar(speed / wl); g.vel.lerp(want, Math.min(1, dt * 1.2)); g.pos.addScaledVector(g.vel, dt);
     // body follows the head like a chain, with a travelling side-to-side wave
     const P = g.pts; P[0].copy(g.pos); const sp = g.vel.length();
