@@ -5,7 +5,7 @@ const FAB = [
   { id: 'thrust', name: 'Thruster pack', max: 2, desc: 'Faster suit thrusters.', cost: l => l ? { glass: 8, scrap: 10 } : { glass: 4, scrap: 6 }, make: () => G.up.thrust++ },
   { id: 'flare', name: 'Flares (2)', desc: 'Throw one to push the thing in the fog back.', cost: () => ({ glass: 2 }), make: () => G.p.flares += 2 },
   { id: 'lamp', name: 'Suit fog lamp', max: 1, desc: 'Brighter suit lamp. The thing in the fog moves slower.', need: () => (G.flags.samplesIn || 0) >= 1, lockText: 'Needs research from Dr. Pryce (1 sample).', cost: () => ({ glass: 6, ice: 4 }), make: () => G.up.lamp++ },
-  { id: 'hush', name: 'Hush coils', max: 2, desc: 'Quieter engines. Less noise for things to hear.', cost: l => l ? { glass: 10, scrap: 12 } : { glass: 6, scrap: 8 }, make: () => G.up.hush++ },
+  { id: 'hush', name: 'Shadow coils', max: 2, desc: 'The hunters notice the ship from less far away.', cost: l => l ? { glass: 10, scrap: 12 } : { glass: 6, scrap: 8 }, make: () => G.up.hush++ },
   { id: 'plating', name: 'Hull plating', max: 3, desc: 'Stronger hull (+25).', cost: l => ({ ore: 12 + l * 6, scrap: 8 + l * 4 }), make: () => { G.up.plating++; G.ship.hullMax += 25; G.ship.hull += 25; } },
 ];
 const BUILD = [
@@ -144,7 +144,7 @@ const G = {
     fade(() => {
       this.state = 'eva'; this.evaCount++; setMood('eva'); const E = this.e = { pos: SP.ship.localToWorld(SP.airlockLocal.clone()), vel: new THREE.Vector3(), yaw: this.ship.yaw - Math.PI / 2, pitch: 0, o2: this.o2Max(), t: 0, mineT: 0, breathT: 0, heartT: 0, flares: [], warnT: 0 };
       E.vel.set(Math.cos(this.ship.yaw), 0, -Math.sin(this.ship.yaw)).multiplyScalar(2);
-      G.flares = []; const P = SP.pale; P.on = false; P.spawnAt = Math.max(8, 18 - this.evaCount * 2) + Math.random() * 8; P.state = 'none';
+      G.flares = []; const P = SP.pale; P.on = false; P.spawnAt = 5; P.state = 'none';
       SP.suitLamp.intensity = this.up.lamp ? 20 : 13; $('#cross').classList.remove('hidden'); $('#compass').classList.remove('hidden'); $('#map').classList.add('hidden');
       loopTo('wind', .25, 1); this.refreshTouch(); if (this.q.stage === 2) this.setStage(3);
       UI.toast(this.mode === 'pc' ? 'Hold the left mouse button on glowing rocks to mine. B to build.' : 'Hold Use on glowing rocks to mine. Build to place base parts.', 4000);
@@ -266,7 +266,7 @@ function updateGulpers(dt) {
   const S = G.ship; let hunted = false; const near = new THREE.Vector3();
   for (const g of SP.gulpers) {
     g.t += dt; g.cool -= dt; shipAxisClosest(g.pos, near); const d = near.distanceTo(g.pos);
-    const detect = (260 + 700 * (G.noise || 0)) * (G.state === 'eva' ? .3 : 1);
+    const detect = 380 * (1 - .2 * G.up.hush) * (G.state === 'eva' ? .4 : 1);
     let target, speed;
     if (g.state === 'roam') { if (g.t > 22 || g.pos.distanceTo(g.wp) < 60) { g.t = 0; const stalk = Math.random() < .55; g.wp.copy(stalk ? S.pos : g.home).add(new THREE.Vector3((Math.random() - .5) * (stalk ? 900 : 1400), (Math.random() - .5) * (stalk ? 500 : 900), (Math.random() - .5) * (stalk ? 900 : 1400))); } target = g.wp; speed = 22; if (d < detect && g.cool <= 0 && G.inPlay()) { g.state = 'hunt'; g.lostT = 0; if (d < 1600) sfx('roar', .7); } }
     else if (g.state === 'hunt') { target = near; speed = 60 + Math.min(25, g.t * .5); hunted = true; if (d > detect * 1.3) { g.lostT += dt; if (g.lostT > 5) { g.state = 'roam'; g.t = 0; UI.toast('It lost us.'); } } else g.lostT = 0; if (d < 75) { g.state = 'flee'; g.t = 0; g.cool = 25; S.hull -= 14; sfx('hit'); sfx('roar', 1); G.shake = 1.6; S.vel.addScaledVector(near.clone().sub(g.pos).normalize(), 14); UI.toast('Something hit the ship!'); } }
@@ -334,8 +334,8 @@ function updateEVA(dt) {
   camS.position.copy(E.pos); camS.position.y += Math.sin(E.t * 1.3) * .03;
   SP.suitLamp.position.copy(camS.position).addScaledVector(right, .3).y -= .2; SP.suitLamp.target.position.copy(camS.position).addScaledVector(fwd, 10);
   // fog thickens around you outside
-  const P = SP.pale; const prox = P.on ? clamp(1 - (P.pos.distanceTo(E.pos) - 3) / 50, 0, 1) : 0;
-  SP.scene.fog.density = lerp(SP.scene.fog.density, .0055 + Math.min(.005, E.t * .00012) + prox * .008, dt * .5);
+  const P = SP.pale; const prox = P.on ? clamp(1 - (P.pos.distanceTo(E.pos) - 3) / 70, 0, 1) : 0;
+  SP.scene.fog.density = lerp(SP.scene.fog.density, .0115 + Math.min(.004, E.t * .0001) + prox * .006, dt * .8);
   // oxygen
   const o2Max = G.o2Max(); let refill = false;
   for (const b of G.bases) if ((b.type === 'o2' && b.pos.distanceTo(E.pos) < 6) || (b.type === 'shelter' && b.pos.distanceTo(E.pos) < 3.5)) refill = true;
@@ -381,14 +381,15 @@ function updateEVA(dt) {
 function makeLaser() { const geo = new THREE.CylinderGeometry(.025, .025, 1, 6); geo.rotateX(Math.PI / 2); laser = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xffb070, transparent: true, opacity: .85, blending: THREE.AdditiveBlending, depthWrite: false })); laserGlow = glow(0xffa060, 2, 1); SP.scene.add(laser); SP.scene.add(laserGlow); }
 function updatePale(dt, E, fwd, prox) {
   const P = SP.pale, g = P.g;
-  if (!P.on) { if (E.t > P.spawnAt) { P.on = true; P.state = 'approach'; P.t = 0; const a = Math.random() * TAU; P.pos.copy(E.pos).add(new THREE.Vector3(Math.cos(a) * 80, (Math.random() - .5) * 20, Math.sin(a) * 80)); g.visible = true; sfx('swell', .8); } else { loopTo('growl', 0); loopTo('whisper', 0); $('#vign').style.opacity = 0; $('#static').style.opacity = 0; AU.tension = 0; UI.warn(E.o2 / G.o2Max() < .25 ? 'OXYGEN LOW' : ''); return; } }
+  if (!P.on) { if (E.t > P.spawnAt) { P.on = true; P.state = 'approach'; P.t = 0; const a = -E.yaw - Math.PI / 2 + (Math.random() - .5) * 1.2; P.pos.copy(E.pos).add(new THREE.Vector3(Math.cos(a) * 28, 2 + (Math.random() - .5) * 4, Math.sin(a) * 28)); P.fade = 0; g.visible = true; sfx('swell', .8); } else { loopTo('growl', 0); loopTo('whisper', 0); $('#vign').style.opacity = 0; $('#static').style.opacity = 0; AU.tension = 0; UI.warn(E.o2 / G.o2Max() < .25 ? 'OXYGEN LOW' : ''); return; } }
+  P.fade = Math.min(1, (P.fade || 0) + dt / 5); for (const m of P.mats) m.opacity = P.fade * P.fade * (3 - 2 * P.fade); if (P.aura) P.aura.material.opacity = .16 * P.fade;
   P.t += dt; const toP = E.pos.clone().sub(P.pos); const d = toP.length(); toP.divideScalar(d || 1);
   const seen = fwd.dot(toP.clone().negate()) > Math.cos(.38) && d < 45;
   let speed = (1.4 + Math.min(3.6, P.t * .045)) * (G.up.lamp ? .75 : 1) * (seen ? .45 : 1);
   const safe = safeZone(E.pos);
   if (P.state === 'flee') { P.fleeT += dt; P.pos.addScaledVector(toP, -7 * dt); if (P.fleeT > 9) { P.state = 'approach'; P.t = Math.min(P.t, 20); } }
   else if (safe) { const ds = P.pos.distanceTo(safe); const keep = 20; if (ds > keep + 1) P.pos.addScaledVector(toP, speed * dt); else { const side = new THREE.Vector3(-toP.z, 0, toP.x); P.pos.addScaledVector(side, dt * 1.2); P.pos.addScaledVector(P.pos.clone().sub(safe).normalize(), (keep - ds) * dt); } P.safeT = (P.safeT || 0) + dt; if (P.safeT > 30) { P.on = false; g.visible = false; P.spawnAt = E.t + 20 + Math.random() * 15; P.safeT = 0; } }
-  else { P.safeT = 0; P.pos.addScaledVector(toP, speed * dt); if (d > 120) { const a = Math.random() * TAU; P.pos.copy(E.pos).add(new THREE.Vector3(Math.cos(a) * 75, 0, Math.sin(a) * 75)); } if (d < 2.4) G.caught(); }
+  else { P.safeT = 0; P.pos.addScaledVector(toP, speed * dt); if (d > 170) { const a = Math.random() * TAU; P.pos.copy(E.pos).add(new THREE.Vector3(Math.cos(a) * 120, 0, Math.sin(a) * 120)); } if (d < 2.4) G.caught(); }
   // look and move like something wrong
   g.position.copy(P.pos); g.position.y += Math.sin(P.t * .9) * .25 - 2.4; g.lookAt(E.pos.x, g.position.y, E.pos.z);
   // animation: slow wrong walk, stops dead and twitches when looked at, reaches out when close
@@ -510,7 +511,7 @@ function frame(now) {
   // HUD
   UI.res();
   if (st === 'ship') UI.bars([['Health', G.p.hp / 100, Math.round(G.p.hp)], ['Hull', G.ship.hull / G.ship.hullMax, Math.round(G.ship.hull)]]);
-  if (st === 'helm') { UI.bars([['Hull', G.ship.hull / G.ship.hullMax, Math.round(G.ship.hull)], ['Speed', G.ship.speed / 110, Math.round(G.ship.speed) + ' m/s', '#c8d8dc'], ['Noise', clamp(G.noise / 1.2, 0, 1), G.noise > .8 ? 'LOUD' : G.noise > .4 ? 'Medium' : 'Quiet', G.noise > .8 ? '#e07a6a' : G.noise > .4 ? '#e0b060' : '#80c890']]); drawMap(); $('#cross').classList.toggle('hidden', G.view === 'out'); }
+  if (st === 'helm') { UI.bars([['Hull', G.ship.hull / G.ship.hullMax, Math.round(G.ship.hull)], ['Speed', G.ship.speed / 110, Math.round(G.ship.speed) + ' m/s', '#c8d8dc']]); drawMap(); $('#cross').classList.toggle('hidden', G.view === 'out'); }
   if (st === 'eva' && G.e) UI.bars([['Oxygen', G.e.o2 / G.o2Max(), Math.round(G.e.o2 / G.o2Max() * 100) + '%'], ['Health', G.p.hp / 100, Math.round(G.p.hp)], ['Cargo', G.cargoN() / G.cargoMax(), G.cargoN() + '/' + G.cargoMax(), '#c8d8dc'], ['Flares', Math.min(1, G.p.flares / 6), G.p.flares, '#ff9a6a']]);
   // render
   let shake = G.shake || 0; G.shake = Math.max(0, shake - dt * 1.5);

@@ -88,20 +88,20 @@ function baldHead(sm) {
 // the thing in the fog: a tall, too-thin, faceless figure (the female crew body, stretched at the joints)
 function makePaleModel() {
   const src = MD.michelle; const m = THREE.SkeletonUtils.clone(src.scene);
-  const pale = new THREE.MeshStandardMaterial({ color: 0xd4d8d2, roughness: .82, metalness: 0, emissive: 0x141a1a });
+  const pale = new THREE.MeshStandardMaterial({ color: 0xd4d8d2, roughness: .82, metalness: 0, emissive: 0x141a1a, transparent: true, opacity: 1 });
   m.traverse(c => { if (c.isMesh) { c.material = pale; c.frustumCulled = false; if (c.isSkinnedMesh) c.geometry = baldHead(c); } });
   // longer neck, forearms, hands and fingers; slightly longer legs and body
   const len = { Spine1: 1.12, Spine2: 1.12, Neck: 1.1, Head: 1.7, LeftForeArm: 1.3, RightForeArm: 1.3, LeftHand: 1.45, RightHand: 1.45, LeftLeg: 1.12, RightLeg: 1.12, LeftFoot: 1.1, RightFoot: 1.1 };
   m.traverse(o => { if (!o.isBone) return; const n = bname(o); if (len[n]) o.position.multiplyScalar(len[n]); if (/Hand(Thumb|Index|Middle|Ring|Pinky)[2-4]$/.test(n)) o.position.multiplyScalar(1.9); });
-  m.rotation.y = -rigYaw(m); const g = new THREE.Group(); g.add(m); fitHeight(m, 3.9); m.scale.x *= .82; m.scale.z *= .8;
+  m.rotation.y = -rigYaw(m); const g = new THREE.Group(); g.add(m); fitHeight(m, 5.4); m.scale.x *= .82; m.scale.z *= .8;
   // two dark hollows where eyes should be
   const head = boneByName(m, 'Head'); g.updateMatrixWorld(true); let sm = null; m.traverse(c => { if (c.isSkinnedMesh && c.geometry.userData.skull) sm = c; });
   const Hw = head.getWorldPosition(new THREE.Vector3()), Nw = boneByName(m, 'Neck').getWorldPosition(new THREE.Vector3()); const Lw = Hw.distanceTo(Nw) / 1.7; const Cw = Hw.clone().addScaledVector(Hw.clone().sub(Nw).normalize(), Lw * 1.05), Rw = Lw * 1.08;
-  const hole = new THREE.MeshBasicMaterial({ color: 0x000000 });
+  const hole = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true });
   const rc = new THREE.Raycaster(); sm.updateMatrixWorld(true); if (!sm.boundingSphere) sm.computeBoundingSphere(); sm.boundingSphere.radius = 1e4;
   for (const sx of [-1, 1]) { const o = new THREE.Vector3(Cw.x + sx * Rw * .34, Cw.y - Rw * .15, Cw.z + 2); rc.set(o, new THREE.Vector3(0, 0, -1)); const hit = rc.intersectObject(sm)[0];
     const e = new THREE.Mesh(new THREE.SphereGeometry(Rw * .19, 12, 10), hole); e.scale.set(1, 1.5, .5); e.position.copy(hit ? hit.point : new THREE.Vector3(o.x, o.y, Cw.z + Rw)); e.position.z -= Rw * .03; g.add(e); head.attach(e); }
   const mixer = new THREE.AnimationMixer(m); const act = {}; for (const k in src.clips) act[k] = mixer.clipAction(src.clips[k]);
   act.walk.timeScale = .32; act.idle.timeScale = .5; act.walk.play();
-  return { g, model: m, mixer, act, head, cur: 'walk' };
+  return { g, model: m, mixer, act, head, cur: 'walk', mats: [pale, hole] };
 }

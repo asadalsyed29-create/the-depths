@@ -153,6 +153,6 @@ const UI = {
     const pc = false;
     this.panel('How to play', `<div style="line-height:1.55">${pc ? `<b>On foot:</b> WASD to move, arrow keys or mouse to look, Shift to run, Space to jump, E to use or talk.<br><b>At the helm:</b> W/S thrust, A/D turn, arrow keys look around, Space/C climb and dive, Shift boost, V switch view, E or Q stand up.<br><b>Outside:</b> WASD to fly the suit, arrow keys to look, Space/C up and down, Shift boost, hold the left mouse button or E to mine, F or right click for a flare, B to build (R rotate, X remove). Tab shows your bag. Esc pauses.`
       : `<b>On foot:</b> left stick to move, drag the right side to look, Use to talk or use things.<br><b>At the helm:</b> left stick steers and thrusts, Up and Down climb and dive, View switches camera, Leave to stand up.<br><b>Outside:</b> left stick to fly the suit, hold Use to mine, Flare to push the thing in the fog back, Build to place base parts.`}
-      <br><br>Stop the ship near a site, walk to the Suit Room and go out the airlock. Mine resources, then come back inside before your oxygen runs out. Something lives in the fog. Light keeps it back. Big things also hunt by sound, so watch the noise gauge while flying.</div>`);
+      <br><br>Stop the ship near a site, walk to the Suit Room and go out the airlock. Mine resources, then come back inside before your oxygen runs out. Something lives in the fog. Light keeps it back. Huge hunters swim out here too. If one comes after the ship, fly away from it until it gives up.</div>`);
   },
 };

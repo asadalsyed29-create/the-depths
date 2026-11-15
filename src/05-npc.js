@@ -58,15 +58,15 @@ const TREES = {
       c: [{ t: 'What is this place?', go: 'lore' }, { t: 'How do I fly the ship?', go: 'fly' }, { t: 'Where should we go?', go: 'where' }, { t: 'Carry on.', end: 1 }] },
     lore: { t: 'Nobody agrees. Space just thickens here, like we sailed into the bottom of an ocean. Light dies after a few hundred meters. And things drift in from somewhere. Statues. Doors. A whole lighthouse, once. None of it was built by anyone we know.', c: [{ t: 'Who built them?', go: 'who' }, { t: 'Back.', go: 'start' }] },
     who: { t: 'If you find out, tell me before you tell anyone else.', c: [{ t: 'Back.', go: 'start' }] },
-    fly: { t: () => (G.mode === 'pc' ? 'Sit at the helm. W and S for thrust, A and D to turn, Space and C to climb and dive, Shift to boost. Press E to stand up again.' : 'Sit at the helm. The left stick steers and pushes us forward. Up and Down climb and dive. She is big, but she is quick. Tap Leave to stand up again.') + ' And watch the noise gauge. The big things out here hunt by sound. If something starts following us, cut the engines and let it lose us.', c: [{ t: 'Got it.', go: 'start' }] },
+    fly: { t: () => (G.mode === 'pc' ? 'Sit at the helm. W and S for thrust, A and D to turn, Space and C to climb and dive, Shift to boost. Press E to stand up again.' : 'Sit at the helm. The left stick steers and pushes us forward. Up and Down climb and dive. She is big, but she is quick. Tap Leave to stand up again.') + ' And keep an eye out. The big things out here hunt anything that comes close. If one starts following us, fly away until it loses us.', c: [{ t: 'Got it.', go: 'start' }] },
     where: { t: 'There is a rock field about four hundred meters ahead. I have marked it on the helm map. Ore for Okafor\'s repairs. The pale fields give ice, the violet gardens give deepglass, and the wrecks give scrap. And other things.', act: () => { if (G.q.stage === 0) G.setStage(1); }, c: [{ t: 'Back.', go: 'start' }] },
   }),
   okafor: () => ({
     start: { t: G.ship.hull < G.ship.hullMax ? `Hull is at ${Math.round(G.ship.hull / G.ship.hullMax * 100)} percent. Every creak out there is a new crack in here.` : 'Reactor is purring. Which usually means something is about to break.',
       c: [{ t: 'Repair the hull (5 ore, 3 scrap)', if: () => G.ship.hull < G.ship.hullMax, go: 'repair' }, { t: 'What can the workshop make?', go: 'fab' }, { t: 'Tell me about the engines.', go: 'eng' }, { t: 'Bye, Tomas.', end: 1 }] },
     repair: { t: () => { if (G.pay({ ore: 5, scrap: 3 })) { G.ship.hull = Math.min(G.ship.hullMax, G.ship.hull + 35); sfx('place'); if (G.q.stage === 4) G.setStage(5); return 'Done. Plates welded, seams sealed. She will hold. For now.'; } return 'I need five ore and three scrap in the cargo hold. I cannot weld wishes, Captain.'; }, c: [{ t: 'Back.', go: 'start' }] },
-    fab: { t: 'The fabricator in the Workshop builds suit and ship upgrades. Bigger oxygen tanks, thruster packs, flares, hush coils for the engines. You bring materials, it does the rest.', c: [{ t: 'Back.', go: 'start' }] },
-    eng: { t: 'Twelve thousand tonnes of ship and the loudest part is the drive. Out here, loud is a problem. Things follow noise. Hush coils from the fabricator will quiet her down.', c: [{ t: 'Back.', go: 'start' }] },
+    fab: { t: 'The fabricator in the Workshop builds suit and ship upgrades. Bigger oxygen tanks, thruster packs, flares, shadow coils for the hull. You bring materials, it does the rest.', c: [{ t: 'Back.', go: 'start' }] },
+    eng: { t: 'Twelve thousand tonnes of ship and the loudest part is the drive. Out here, big things come for anything that moves. Shadow coils from the fabricator make her harder to notice.', c: [{ t: 'Back.', go: 'start' }] },
   }),
   hartley: () => ({
     start: { t: G.p.hp < 100 ? 'You look terrible, Captain. Sit down.' : 'Clean bill of health. Try to keep it that way.',
@@ -97,7 +97,7 @@ const TREES = {
   pell: () => ({
     start: { t: 'Oh. Captain. Sorry, I was talking to the tomatoes.', c: [{ t: 'Are you alright?', go: 'ok' }, { t: 'How are the crops?', go: 'crops' }, { t: 'Carry on.', end: 1 }] },
     ok: { t: 'The plants lean toward the hull when something big swims past. All of them, at once. I measured it.', c: [{ t: 'And?', go: 'ok2' }] },
-    ok2: { t: 'If the noise gauge on the bridge goes red, stop the engines. Please. They do not have eyes. They listen.', c: [{ t: 'Back.', go: 'start' }] },
+    ok2: { t: 'If something big starts following the ship, get us away from it. Please. They do not have eyes. They feel us coming.', c: [{ t: 'Back.', go: 'start' }] },
     crops: { t: 'Growing. Slowly. Everything is slow down here, except the things that are not.', c: [{ t: 'Back.', go: 'start' }] },
   }),
 };

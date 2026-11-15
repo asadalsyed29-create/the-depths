@@ -4489,22 +4489,22 @@ function baldHead(sm) {
 // the thing in the fog: a tall, too-thin, faceless figure (the female crew body, stretched at the joints)
 function makePaleModel() {
   const src = MD.michelle; const m = THREE.SkeletonUtils.clone(src.scene);
-  const pale = new THREE.MeshStandardMaterial({ color: 0xd4d8d2, roughness: .82, metalness: 0, emissive: 0x141a1a });
+  const pale = new THREE.MeshStandardMaterial({ color: 0xd4d8d2, roughness: .82, metalness: 0, emissive: 0x141a1a, transparent: true, opacity: 1 });
   m.traverse(c => { if (c.isMesh) { c.material = pale; c.frustumCulled = false; if (c.isSkinnedMesh) c.geometry = baldHead(c); } });
   // longer neck, forearms, hands and fingers; slightly longer legs and body
   const len = { Spine1: 1.12, Spine2: 1.12, Neck: 1.1, Head: 1.7, LeftForeArm: 1.3, RightForeArm: 1.3, LeftHand: 1.45, RightHand: 1.45, LeftLeg: 1.12, RightLeg: 1.12, LeftFoot: 1.1, RightFoot: 1.1 };
   m.traverse(o => { if (!o.isBone) return; const n = bname(o); if (len[n]) o.position.multiplyScalar(len[n]); if (/Hand(Thumb|Index|Middle|Ring|Pinky)[2-4]$/.test(n)) o.position.multiplyScalar(1.9); });
-  m.rotation.y = -rigYaw(m); const g = new THREE.Group(); g.add(m); fitHeight(m, 3.9); m.scale.x *= .82; m.scale.z *= .8;
+  m.rotation.y = -rigYaw(m); const g = new THREE.Group(); g.add(m); fitHeight(m, 5.4); m.scale.x *= .82; m.scale.z *= .8;
   // two dark hollows where eyes should be
   const head = boneByName(m, 'Head'); g.updateMatrixWorld(true); let sm = null; m.traverse(c => { if (c.isSkinnedMesh && c.geometry.userData.skull) sm = c; });
   const Hw = head.getWorldPosition(new THREE.Vector3()), Nw = boneByName(m, 'Neck').getWorldPosition(new THREE.Vector3()); const Lw = Hw.distanceTo(Nw) / 1.7; const Cw = Hw.clone().addScaledVector(Hw.clone().sub(Nw).normalize(), Lw * 1.05), Rw = Lw * 1.08;
-  const hole = new THREE.MeshBasicMaterial({ color: 0x000000 });
+  const hole = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true });
   const rc = new THREE.Raycaster(); sm.updateMatrixWorld(true); if (!sm.boundingSphere) sm.computeBoundingSphere(); sm.boundingSphere.radius = 1e4;
   for (const sx of [-1, 1]) { const o = new THREE.Vector3(Cw.x + sx * Rw * .34, Cw.y - Rw * .15, Cw.z + 2); rc.set(o, new THREE.Vector3(0, 0, -1)); const hit = rc.intersectObject(sm)[0];
     const e = new THREE.Mesh(new THREE.SphereGeometry(Rw * .19, 12, 10), hole); e.scale.set(1, 1.5, .5); e.position.copy(hit ? hit.point : new THREE.Vector3(o.x, o.y, Cw.z + Rw)); e.position.z -= Rw * .03; g.add(e); head.attach(e); }
   const mixer = new THREE.AnimationMixer(m); const act = {}; for (const k in src.clips) act[k] = mixer.clipAction(src.clips[k]);
   act.walk.timeScale = .32; act.idle.timeScale = .5; act.walk.play();
-  return { g, model: m, mixer, act, head, cur: 'walk' };
+  return { g, model: m, mixer, act, head, cur: 'walk', mats: [pale, hole] };
 }
 // ---------- crew members ----------
 const NPCS = [
@@ -4566,15 +4566,15 @@ const TREES = {
       c: [{ t: 'What is this place?', go: 'lore' }, { t: 'How do I fly the ship?', go: 'fly' }, { t: 'Where should we go?', go: 'where' }, { t: 'Carry on.', end: 1 }] },
     lore: { t: 'Nobody agrees. Space just thickens here, like we sailed into the bottom of an ocean. Light dies after a few hundred meters. And things drift in from somewhere. Statues. Doors. A whole lighthouse, once. None of it was built by anyone we know.', c: [{ t: 'Who built them?', go: 'who' }, { t: 'Back.', go: 'start' }] },
     who: { t: 'If you find out, tell me before you tell anyone else.', c: [{ t: 'Back.', go: 'start' }] },
-    fly: { t: () => (G.mode === 'pc' ? 'Sit at the helm. W and S for thrust, A and D to turn, Space and C to climb and dive, Shift to boost. Press E to stand up again.' : 'Sit at the helm. The left stick steers and pushes us forward. Up and Down climb and dive. She is big, but she is quick. Tap Leave to stand up again.') + ' And watch the noise gauge. The big things out here hunt by sound. If something starts following us, cut the engines and let it lose us.', c: [{ t: 'Got it.', go: 'start' }] },
+    fly: { t: () => (G.mode === 'pc' ? 'Sit at the helm. W and S for thrust, A and D to turn, Space and C to climb and dive, Shift to boost. Press E to stand up again.' : 'Sit at the helm. The left stick steers and pushes us forward. Up and Down climb and dive. She is big, but she is quick. Tap Leave to stand up again.') + ' And keep an eye out. The big things out here hunt anything that comes close. If one starts following us, fly away until it loses us.', c: [{ t: 'Got it.', go: 'start' }] },
     where: { t: 'There is a rock field about four hundred meters ahead. I have marked it on the helm map. Ore for Okafor\'s repairs. The pale fields give ice, the violet gardens give deepglass, and the wrecks give scrap. And other things.', act: () => { if (G.q.stage === 0) G.setStage(1); }, c: [{ t: 'Back.', go: 'start' }] },
   }),
   okafor: () => ({
     start: { t: G.ship.hull < G.ship.hullMax ? `Hull is at ${Math.round(G.ship.hull / G.ship.hullMax * 100)} percent. Every creak out there is a new crack in here.` : 'Reactor is purring. Which usually means something is about to break.',
       c: [{ t: 'Repair the hull (5 ore, 3 scrap)', if: () => G.ship.hull < G.ship.hullMax, go: 'repair' }, { t: 'What can the workshop make?', go: 'fab' }, { t: 'Tell me about the engines.', go: 'eng' }, { t: 'Bye, Tomas.', end: 1 }] },
     repair: { t: () => { if (G.pay({ ore: 5, scrap: 3 })) { G.ship.hull = Math.min(G.ship.hullMax, G.ship.hull + 35); sfx('place'); if (G.q.stage === 4) G.setStage(5); return 'Done. Plates welded, seams sealed. She will hold. For now.'; } return 'I need five ore and three scrap in the cargo hold. I cannot weld wishes, Captain.'; }, c: [{ t: 'Back.', go: 'start' }] },
-    fab: { t: 'The fabricator in the Workshop builds suit and ship upgrades. Bigger oxygen tanks, thruster packs, flares, hush coils for the engines. You bring materials, it does the rest.', c: [{ t: 'Back.', go: 'start' }] },
-    eng: { t: 'Twelve thousand tonnes of ship and the loudest part is the drive. Out here, loud is a problem. Things follow noise. Hush coils from the fabricator will quiet her down.', c: [{ t: 'Back.', go: 'start' }] },
+    fab: { t: 'The fabricator in the Workshop builds suit and ship upgrades. Bigger oxygen tanks, thruster packs, flares, shadow coils for the hull. You bring materials, it does the rest.', c: [{ t: 'Back.', go: 'start' }] },
+    eng: { t: 'Twelve thousand tonnes of ship and the loudest part is the drive. Out here, big things come for anything that moves. Shadow coils from the fabricator make her harder to notice.', c: [{ t: 'Back.', go: 'start' }] },
   }),
   hartley: () => ({
     start: { t: G.p.hp < 100 ? 'You look terrible, Captain. Sit down.' : 'Clean bill of health. Try to keep it that way.',
@@ -4605,7 +4605,7 @@ const TREES = {
   pell: () => ({
     start: { t: 'Oh. Captain. Sorry, I was talking to the tomatoes.', c: [{ t: 'Are you alright?', go: 'ok' }, { t: 'How are the crops?', go: 'crops' }, { t: 'Carry on.', end: 1 }] },
     ok: { t: 'The plants lean toward the hull when something big swims past. All of them, at once. I measured it.', c: [{ t: 'And?', go: 'ok2' }] },
-    ok2: { t: 'If the noise gauge on the bridge goes red, stop the engines. Please. They do not have eyes. They listen.', c: [{ t: 'Back.', go: 'start' }] },
+    ok2: { t: 'If something big starts following the ship, get us away from it. Please. They do not have eyes. They feel us coming.', c: [{ t: 'Back.', go: 'start' }] },
     crops: { t: 'Growing. Slowly. Everything is slow down here, except the things that are not.', c: [{ t: 'Back.', go: 'start' }] },
   }),
 };
@@ -5274,7 +5274,7 @@ const UI = {
     const pc = false;
     this.panel('How to play', `<div style="line-height:1.55">${pc ? `<b>On foot:</b> WASD to move, arrow keys or mouse to look, Shift to run, Space to jump, E to use or talk.<br><b>At the helm:</b> W/S thrust, A/D turn, arrow keys look around, Space/C climb and dive, Shift boost, V switch view, E or Q stand up.<br><b>Outside:</b> WASD to fly the suit, arrow keys to look, Space/C up and down, Shift boost, hold the left mouse button or E to mine, F or right click for a flare, B to build (R rotate, X remove). Tab shows your bag. Esc pauses.`
       : `<b>On foot:</b> left stick to move, drag the right side to look, Use to talk or use things.<br><b>At the helm:</b> left stick steers and thrusts, Up and Down climb and dive, View switches camera, Leave to stand up.<br><b>Outside:</b> left stick to fly the suit, hold Use to mine, Flare to push the thing in the fog back, Build to place base parts.`}
-      <br><br>Stop the ship near a site, walk to the Suit Room and go out the airlock. Mine resources, then come back inside before your oxygen runs out. Something lives in the fog. Light keeps it back. Big things also hunt by sound, so watch the noise gauge while flying.</div>`);
+      <br><br>Stop the ship near a site, walk to the Suit Room and go out the airlock. Mine resources, then come back inside before your oxygen runs out. Something lives in the fog. Light keeps it back. Huge hunters swim out here too. If one comes after the ship, fly away from it until it gives up.</div>`);
   },
 };
 // ---------- upgrades and base modules ----------
@@ -5284,7 +5284,7 @@ const FAB = [
   { id: 'thrust', name: 'Thruster pack', max: 2, desc: 'Faster suit thrusters.', cost: l => l ? { glass: 8, scrap: 10 } : { glass: 4, scrap: 6 }, make: () => G.up.thrust++ },
   { id: 'flare', name: 'Flares (2)', desc: 'Throw one to push the thing in the fog back.', cost: () => ({ glass: 2 }), make: () => G.p.flares += 2 },
   { id: 'lamp', name: 'Suit fog lamp', max: 1, desc: 'Brighter suit lamp. The thing in the fog moves slower.', need: () => (G.flags.samplesIn || 0) >= 1, lockText: 'Needs research from Dr. Pryce (1 sample).', cost: () => ({ glass: 6, ice: 4 }), make: () => G.up.lamp++ },
-  { id: 'hush', name: 'Hush coils', max: 2, desc: 'Quieter engines. Less noise for things to hear.', cost: l => l ? { glass: 10, scrap: 12 } : { glass: 6, scrap: 8 }, make: () => G.up.hush++ },
+  { id: 'hush', name: 'Shadow coils', max: 2, desc: 'The hunters notice the ship from less far away.', cost: l => l ? { glass: 10, scrap: 12 } : { glass: 6, scrap: 8 }, make: () => G.up.hush++ },
   { id: 'plating', name: 'Hull plating', max: 3, desc: 'Stronger hull (+25).', cost: l => ({ ore: 12 + l * 6, scrap: 8 + l * 4 }), make: () => { G.up.plating++; G.ship.hullMax += 25; G.ship.hull += 25; } },
 ];
 const BUILD = [
@@ -5423,7 +5423,7 @@ const G = {
     fade(() => {
       this.state = 'eva'; this.evaCount++; setMood('eva'); const E = this.e = { pos: SP.ship.localToWorld(SP.airlockLocal.clone()), vel: new THREE.Vector3(), yaw: this.ship.yaw - Math.PI / 2, pitch: 0, o2: this.o2Max(), t: 0, mineT: 0, breathT: 0, heartT: 0, flares: [], warnT: 0 };
       E.vel.set(Math.cos(this.ship.yaw), 0, -Math.sin(this.ship.yaw)).multiplyScalar(2);
-      G.flares = []; const P = SP.pale; P.on = false; P.spawnAt = Math.max(8, 18 - this.evaCount * 2) + Math.random() * 8; P.state = 'none';
+      G.flares = []; const P = SP.pale; P.on = false; P.spawnAt = 5; P.state = 'none';
       SP.suitLamp.intensity = this.up.lamp ? 20 : 13; $('#cross').classList.remove('hidden'); $('#compass').classList.remove('hidden'); $('#map').classList.add('hidden');
       loopTo('wind', .25, 1); this.refreshTouch(); if (this.q.stage === 2) this.setStage(3);
       UI.toast(this.mode === 'pc' ? 'Hold the left mouse button on glowing rocks to mine. B to build.' : 'Hold Use on glowing rocks to mine. Build to place base parts.', 4000);
@@ -5545,7 +5545,7 @@ function updateGulpers(dt) {
   const S = G.ship; let hunted = false; const near = new THREE.Vector3();
   for (const g of SP.gulpers) {
     g.t += dt; g.cool -= dt; shipAxisClosest(g.pos, near); const d = near.distanceTo(g.pos);
-    const detect = (260 + 700 * (G.noise || 0)) * (G.state === 'eva' ? .3 : 1);
+    const detect = 380 * (1 - .2 * G.up.hush) * (G.state === 'eva' ? .4 : 1);
     let target, speed;
     if (g.state === 'roam') { if (g.t > 22 || g.pos.distanceTo(g.wp) < 60) { g.t = 0; const stalk = Math.random() < .55; g.wp.copy(stalk ? S.pos : g.home).add(new THREE.Vector3((Math.random() - .5) * (stalk ? 900 : 1400), (Math.random() - .5) * (stalk ? 500 : 900), (Math.random() - .5) * (stalk ? 900 : 1400))); } target = g.wp; speed = 22; if (d < detect && g.cool <= 0 && G.inPlay()) { g.state = 'hunt'; g.lostT = 0; if (d < 1600) sfx('roar', .7); } }
     else if (g.state === 'hunt') { target = near; speed = 60 + Math.min(25, g.t * .5); hunted = true; if (d > detect * 1.3) { g.lostT += dt; if (g.lostT > 5) { g.state = 'roam'; g.t = 0; UI.toast('It lost us.'); } } else g.lostT = 0; if (d < 75) { g.state = 'flee'; g.t = 0; g.cool = 25; S.hull -= 14; sfx('hit'); sfx('roar', 1); G.shake = 1.6; S.vel.addScaledVector(near.clone().sub(g.pos).normalize(), 14); UI.toast('Something hit the ship!'); } }
@@ -5613,8 +5613,8 @@ function updateEVA(dt) {
   camS.position.copy(E.pos); camS.position.y += Math.sin(E.t * 1.3) * .03;
   SP.suitLamp.position.copy(camS.position).addScaledVector(right, .3).y -= .2; SP.suitLamp.target.position.copy(camS.position).addScaledVector(fwd, 10);
   // fog thickens around you outside
-  const P = SP.pale; const prox = P.on ? clamp(1 - (P.pos.distanceTo(E.pos) - 3) / 50, 0, 1) : 0;
-  SP.scene.fog.density = lerp(SP.scene.fog.density, .0055 + Math.min(.005, E.t * .00012) + prox * .008, dt * .5);
+  const P = SP.pale; const prox = P.on ? clamp(1 - (P.pos.distanceTo(E.pos) - 3) / 70, 0, 1) : 0;
+  SP.scene.fog.density = lerp(SP.scene.fog.density, .0115 + Math.min(.004, E.t * .0001) + prox * .006, dt * .8);
   // oxygen
   const o2Max = G.o2Max(); let refill = false;
   for (const b of G.bases) if ((b.type === 'o2' && b.pos.distanceTo(E.pos) < 6) || (b.type === 'shelter' && b.pos.distanceTo(E.pos) < 3.5)) refill = true;
@@ -5660,14 +5660,15 @@ function updateEVA(dt) {
 function makeLaser() { const geo = new THREE.CylinderGeometry(.025, .025, 1, 6); geo.rotateX(Math.PI / 2); laser = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: 0xffb070, transparent: true, opacity: .85, blending: THREE.AdditiveBlending, depthWrite: false })); laserGlow = glow(0xffa060, 2, 1); SP.scene.add(laser); SP.scene.add(laserGlow); }
 function updatePale(dt, E, fwd, prox) {
   const P = SP.pale, g = P.g;
-  if (!P.on) { if (E.t > P.spawnAt) { P.on = true; P.state = 'approach'; P.t = 0; const a = Math.random() * TAU; P.pos.copy(E.pos).add(new THREE.Vector3(Math.cos(a) * 80, (Math.random() - .5) * 20, Math.sin(a) * 80)); g.visible = true; sfx('swell', .8); } else { loopTo('growl', 0); loopTo('whisper', 0); $('#vign').style.opacity = 0; $('#static').style.opacity = 0; AU.tension = 0; UI.warn(E.o2 / G.o2Max() < .25 ? 'OXYGEN LOW' : ''); return; } }
+  if (!P.on) { if (E.t > P.spawnAt) { P.on = true; P.state = 'approach'; P.t = 0; const a = -E.yaw - Math.PI / 2 + (Math.random() - .5) * 1.2; P.pos.copy(E.pos).add(new THREE.Vector3(Math.cos(a) * 28, 2 + (Math.random() - .5) * 4, Math.sin(a) * 28)); P.fade = 0; g.visible = true; sfx('swell', .8); } else { loopTo('growl', 0); loopTo('whisper', 0); $('#vign').style.opacity = 0; $('#static').style.opacity = 0; AU.tension = 0; UI.warn(E.o2 / G.o2Max() < .25 ? 'OXYGEN LOW' : ''); return; } }
+  P.fade = Math.min(1, (P.fade || 0) + dt / 5); for (const m of P.mats) m.opacity = P.fade * P.fade * (3 - 2 * P.fade); if (P.aura) P.aura.material.opacity = .16 * P.fade;
   P.t += dt; const toP = E.pos.clone().sub(P.pos); const d = toP.length(); toP.divideScalar(d || 1);
   const seen = fwd.dot(toP.clone().negate()) > Math.cos(.38) && d < 45;
   let speed = (1.4 + Math.min(3.6, P.t * .045)) * (G.up.lamp ? .75 : 1) * (seen ? .45 : 1);
   const safe = safeZone(E.pos);
   if (P.state === 'flee') { P.fleeT += dt; P.pos.addScaledVector(toP, -7 * dt); if (P.fleeT > 9) { P.state = 'approach'; P.t = Math.min(P.t, 20); } }
   else if (safe) { const ds = P.pos.distanceTo(safe); const keep = 20; if (ds > keep + 1) P.pos.addScaledVector(toP, speed * dt); else { const side = new THREE.Vector3(-toP.z, 0, toP.x); P.pos.addScaledVector(side, dt * 1.2); P.pos.addScaledVector(P.pos.clone().sub(safe).normalize(), (keep - ds) * dt); } P.safeT = (P.safeT || 0) + dt; if (P.safeT > 30) { P.on = false; g.visible = false; P.spawnAt = E.t + 20 + Math.random() * 15; P.safeT = 0; } }
-  else { P.safeT = 0; P.pos.addScaledVector(toP, speed * dt); if (d > 120) { const a = Math.random() * TAU; P.pos.copy(E.pos).add(new THREE.Vector3(Math.cos(a) * 75, 0, Math.sin(a) * 75)); } if (d < 2.4) G.caught(); }
+  else { P.safeT = 0; P.pos.addScaledVector(toP, speed * dt); if (d > 170) { const a = Math.random() * TAU; P.pos.copy(E.pos).add(new THREE.Vector3(Math.cos(a) * 120, 0, Math.sin(a) * 120)); } if (d < 2.4) G.caught(); }
   // look and move like something wrong
   g.position.copy(P.pos); g.position.y += Math.sin(P.t * .9) * .25 - 2.4; g.lookAt(E.pos.x, g.position.y, E.pos.z);
   // animation: slow wrong walk, stops dead and twitches when looked at, reaches out when close
@@ -5789,7 +5790,7 @@ function frame(now) {
   // HUD
   UI.res();
   if (st === 'ship') UI.bars([['Health', G.p.hp / 100, Math.round(G.p.hp)], ['Hull', G.ship.hull / G.ship.hullMax, Math.round(G.ship.hull)]]);
-  if (st === 'helm') { UI.bars([['Hull', G.ship.hull / G.ship.hullMax, Math.round(G.ship.hull)], ['Speed', G.ship.speed / 110, Math.round(G.ship.speed) + ' m/s', '#c8d8dc'], ['Noise', clamp(G.noise / 1.2, 0, 1), G.noise > .8 ? 'LOUD' : G.noise > .4 ? 'Medium' : 'Quiet', G.noise > .8 ? '#e07a6a' : G.noise > .4 ? '#e0b060' : '#80c890']]); drawMap(); $('#cross').classList.toggle('hidden', G.view === 'out'); }
+  if (st === 'helm') { UI.bars([['Hull', G.ship.hull / G.ship.hullMax, Math.round(G.ship.hull)], ['Speed', G.ship.speed / 110, Math.round(G.ship.speed) + ' m/s', '#c8d8dc']]); drawMap(); $('#cross').classList.toggle('hidden', G.view === 'out'); }
   if (st === 'eva' && G.e) UI.bars([['Oxygen', G.e.o2 / G.o2Max(), Math.round(G.e.o2 / G.o2Max() * 100) + '%'], ['Health', G.p.hp / 100, Math.round(G.p.hp)], ['Cargo', G.cargoN() / G.cargoMax(), G.cargoN() + '/' + G.cargoMax(), '#c8d8dc'], ['Flares', Math.min(1, G.p.flares / 6), G.p.flares, '#ff9a6a']]);
   // render
   let shake = G.shake || 0; G.shake = Math.max(0, shake - dt * 1.5);
