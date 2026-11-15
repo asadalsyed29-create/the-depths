@@ -92,7 +92,7 @@ const TREES = {
   }),
   rook: () => ({
     start: { t: 'Stores are counted, sorted and judged, Captain.', c: [{ t: 'Show me the stores.', end: 1, act: () => setTimeout(() => UI.showStores(), 50) }, { t: 'How do I build a base?', go: 'base' }, { t: 'Can I have some flares?', go: 'flares' }, { t: 'That is all.', end: 1 }] },
-    base: { t: 'Out here, a base is just a promise you make to a rock. Go outside near a site, open the Build menu and place modules. Materials come straight from the ship\'s stores.', c: [{ t: 'What should I build first?', go: 'base2' }] },
+    base: { t: 'Out here, a base is just a promise you make to a rock. Go outside near a site, open the Build menu and place modules.', c: [{ t: 'What should I build first?', go: 'base2' }] },
     base2: { t: 'Lanterns. Always lanterns first. Then an extractor, it keeps digging while you are away. Oxygen nodes and shelters if you plan to stay. Floors and walls if you want it to feel like home.', act: () => { if (G.q.stage === 5) G.setStage(6); if (!G.flags.flareGift) { G.flags.flareGift = 1; G.p.flares += 2; UI.toast('Received 2 flares'); } }, c: [{ t: 'Back.', go: 'start' }] },
     flares: { t: () => G.p.flares < 1 && !G.flags.flare2 ? (G.flags.flare2 = 1, G.p.flares += 2, UI.toast('Received 2 flares'), 'Two flares. Bring them back unused and I will be very surprised.') : 'The fabricator makes more from deepglass. I am a quartermaster, not a fireworks shop.', c: [{ t: 'Back.', go: 'start' }] },
   }),

@@ -4602,7 +4602,7 @@ const TREES = {
   }),
   rook: () => ({
     start: { t: 'Stores are counted, sorted and judged, Captain.', c: [{ t: 'Show me the stores.', end: 1, act: () => setTimeout(() => UI.showStores(), 50) }, { t: 'How do I build a base?', go: 'base' }, { t: 'Can I have some flares?', go: 'flares' }, { t: 'That is all.', end: 1 }] },
-    base: { t: 'Out here, a base is just a promise you make to a rock. Go outside near a site, open the Build menu and place modules. Materials come straight from the ship\'s stores.', c: [{ t: 'What should I build first?', go: 'base2' }] },
+    base: { t: 'Out here, a base is just a promise you make to a rock. Go outside near a site, open the Build menu and place modules.', c: [{ t: 'What should I build first?', go: 'base2' }] },
     base2: { t: 'Lanterns. Always lanterns first. Then an extractor, it keeps digging while you are away. Oxygen nodes and shelters if you plan to stay. Floors and walls if you want it to feel like home.', act: () => { if (G.q.stage === 5) G.setStage(6); if (!G.flags.flareGift) { G.flags.flareGift = 1; G.p.flares += 2; UI.toast('Received 2 flares'); } }, c: [{ t: 'Back.', go: 'start' }] },
     flares: { t: () => G.p.flares < 1 && !G.flags.flare2 ? (G.flags.flare2 = 1, G.p.flares += 2, UI.toast('Received 2 flares'), 'Two flares. Bring them back unused and I will be very surprised.') : 'The fabricator makes more from deepglass. I am a quartermaster, not a fireworks shop.', c: [{ t: 'Back.', go: 'start' }] },
   }),
@@ -5378,12 +5378,11 @@ const UI = {
   },
   pauseMenu() {
     if (this.blocking()) return;
-    const b = this.panel('Paused', `<div class="seg" style="flex-direction:column;align-items:stretch;gap:8px"><button id="pmR">Resume</button><button id="pmS">Save game</button><button id="pmO">Settings</button><button id="pmH">How to play</button><button id="pmC">Cheats</button><button id="pmQ">Save and quit to title</button></div>`);
+    const b = this.panel('Paused', `<div class="seg" style="flex-direction:column;align-items:stretch;gap:8px"><button id="pmR">Resume</button><button id="pmS">Save game</button><button id="pmO">Settings</button><button id="pmH">How to play</button><button id="pmQ">Save and quit to title</button></div>`);
     b.querySelector('#pmR').onclick = () => this.closePanel();
     b.querySelector('#pmS').onclick = () => { G.save(); this.toast('Game saved'); this.closePanel(); };
     b.querySelector('#pmO').onclick = () => { this.closePanel(); this.settings(); };
     b.querySelector('#pmH').onclick = () => { this.closePanel(); this.help(); };
-    b.querySelector('#pmC').onclick = () => { this.closePanel(); this.cheats(); };
     b.querySelector('#pmQ').onclick = () => { G.save(); this.closePanel(); G.toTitle(); };
   },
   settingsHtml() {
@@ -5405,60 +5404,6 @@ const UI = {
       <br><br>Stop the ship near a site, walk to the Suit Room and go out the airlock. Mine resources, then come back inside before your oxygen runs out. Something lives in the fog. Light keeps it back. Huge hunters swim out here too. If one comes after the ship, fly away from it until it gives up.</div>`);
   },
 };
-// ---------- cheats console (for testing) ----------
-const CHEAT = { god: false, nomon: false, fast: false };
-const CHAPTERS = [[0, 'Start of the game', 'depths'], [9, 'Find the lighthouse', 'depths'], [10, 'Find the core fragments', 'depths'], [12, 'Install the first core', 'depths'],
-  [13, 'The Abyss: find fragments', 'abyss'], [15, 'Install the second core', 'abyss'], [16, 'The Heart: light the pillars', 'heart'], [17, 'Bring Pryce samples', 'heart'],
-  [18, 'Brace the hull', 'heart'], [19, 'Fly into the Heart', 'heart'], [20, 'After the ending', 'heart']];
-function cheatTick() {
-  if (CHEAT.god) { G.ship.hull = G.ship.hullMax; G.p.hp = 100; if (G.e) G.e.o2 = G.o2Max(); }
-  if (CHEAT.nomon) { const P = SP.pale; if (P.on) { P.on = false; P.g.visible = false; P.fade = 0; loopTo('growl', 0); loopTo('whisper', 0); } if (G.e) P.spawnAt = G.e.t + 1e6; }
-}
-function cheatGoZone(id) { if (G.zone === id) return; if (G.state === 'eva') G.endEVA(); G.switchZone(id); G.ship.pos.copy(ARRIVE); G.ship.vel.set(0, 0, 0); G.ship.yaw = 0; }
-function cheatChapter(st) {
-  const c = CHAPTERS.find(x => x[0] === st); cheatGoZone(c[2]);
-  if (st >= 19) { G.ship.hullMax = Math.max(G.ship.hullMax, 140); G.ship.hull = G.ship.hullMax; }
-  if (st === 20) G.flags.ended = 1; G.setStage(st); if (st === 16) updPillars(); G.refreshTouch(); G.save();
-}
-function cheatFrags() { const zd = G.zd[G.zone]; zd.frags = SP.sites.filter(s => s.frag).map(s => s.i); applyFrags(); G.fragCheck(); G.save(); }
-function cheatNextFrag() {
-  const s = SP.sites.find(s => s.frag && s.frag.g.visible); if (!s) return 'No fragments left in this bubble.';
-  if (G.state === 'eva') { G.e.pos.copy(s.frag.wp); G.e.vel.set(0, 0, 0); return 'Moved you to the fragment in ' + s.name + '.'; }
-  s.known = true; G.ship.pos.copy(s.c).add(new THREE.Vector3(0, 0, 620)); G.ship.vel.set(0, 0, 0); G.ship.yaw = 0; return 'Moved the ship next to ' + s.name + '. Go outside to pick it up.';
-}
-const CHEAT_CMDS = {
-  help: () => 'Commands: god, nomon, fast, give ore 50, give all 100, frags, nextfrag, stage 13, go abyss, map, upgrades, heal, end',
-  god: () => (CHEAT.god = !CHEAT.god, 'God mode ' + (CHEAT.god ? 'on' : 'off')),
-  nomon: () => (CHEAT.nomon = !CHEAT.nomon, 'No monsters ' + (CHEAT.nomon ? 'on' : 'off')),
-  fast: () => (CHEAT.fast = !CHEAT.fast, 'Super speed ' + (CHEAT.fast ? 'on' : 'off')),
-  give: (k, n) => { n = +n || 50; const ks = !k || k === 'all' ? ['ore', 'ice', 'glass', 'scrap', 'samples'] : [k === 'deepglass' ? 'glass' : k]; if (ks.some(x => !(x in G.res))) return 'Unknown material. Use ore, ice, glass, scrap, samples or all.'; for (const x of ks) G.res[x] += n; G.save(); return 'Added ' + n + ' ' + ks.join(', '); },
-  frags: () => (cheatFrags(), 'All fragments in this bubble collected'),
-  nextfrag: () => cheatNextFrag(),
-  stage: n => { const c = CHAPTERS.find(x => x[0] === +n); if (!c) return 'Stages: ' + CHAPTERS.map(x => x[0]).join(', '); cheatChapter(+n); return 'Jumped to: ' + c[1]; },
-  go: id => { id = (id || '').replace(/^the/, ''); if (!ZONES[id]) return 'Bubbles: depths, abyss, heart'; cheatGoZone(id); G.save(); return 'Now in ' + ZONES[id].name; },
-  map: () => { for (const s of SP.sites) s.known = true; return 'Every place is shown on the map'; },
-  upgrades: () => { for (const f of FAB) if (f.max) while ((G.up[f.id] || 0) < f.max) f.make(); G.save(); return 'All workshop upgrades made'; },
-  heal: () => { G.ship.hull = G.ship.hullMax; G.p.hp = 100; if (G.e) G.e.o2 = G.o2Max(); return 'Hull, health and oxygen full'; },
-  end: () => { if (G.zone !== 'heart') cheatGoZone('heart'); G.ship.hullMax = Math.max(G.ship.hullMax, 140); G.setStage(19); UI.closePanel(); G.q.stage = 19.5; heartEnding(); return ''; },
-};
-function runCheat(line) { const [c, ...a] = line.trim().toLowerCase().split(/\s+/); const f = CHEAT_CMDS[c]; return f ? f(...a) : 'Unknown command. Type help.'; }
-UI.cheats = function () {
-  const tog = (k, l) => `<div class="row"><div class="d">${l}</div><button data-t="${k}">${CHEAT[k] ? 'On' : 'Off'}</button></div>`;
-  const btn = (c, l) => `<div class="row"><div class="d">${l}</div><button data-c="${c}">Do it</button></div>`;
-  const b = this.panel('Cheats', `<div class="lbl">CONSOLE</div><div style="display:flex;gap:8px"><input id="chIn" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Type a command, or help" style="flex:1;min-width:0;padding:8px;background:#0d1417;color:#dfe8ea;border:1px solid #3a4a50;font:inherit"><button id="chGo">Run</button></div><div id="chOut" style="color:#9ab;font-size:13px;min-height:18px;margin:6px 0 4px"></div>
-    <div class="lbl">TOGGLES</div>${tog('god', 'God mode (no damage, endless oxygen)')}${tog('nomon', 'No monsters')}${tog('fast', 'Super speed (ship and suit)')}
-    <div class="lbl">QUICK</div>${btn('give all 100', 'Add 100 of every material')}${btn('frags', 'Collect all core fragments in this bubble')}${btn('nextfrag', 'Move to the next core fragment')}${btn('map', 'Show every place on the map')}${btn('upgrades', 'Make all workshop upgrades')}${btn('heal', 'Fill hull, health and oxygen')}
-    <div class="lbl">GO TO BUBBLE</div><div class="seg">${ZONE_ORDER.map(id => `<button data-c="go ${id}">${ZONES[id].name}</button>`).join('')}</div>
-    <div class="lbl">JUMP TO CHAPTER</div>${CHAPTERS.map(c => btn('stage ' + c[0], c[1])).join('')}
-    ${btn('end', 'Play the ending now')}`);
-  const out = b.querySelector('#chOut'), inp = b.querySelector('#chIn');
-  const run = s => { if (!s.trim()) return; const r = runCheat(s); if (G.state === 'cut') return; out.textContent = r; sfx('ui'); };
-  b.querySelector('#chGo').onclick = () => { run(inp.value); inp.value = ''; };
-  inp.onkeydown = e => { e.stopPropagation(); if (e.key === 'Enter') { run(inp.value); inp.value = ''; } };
-  inp.onkeyup = e => e.stopPropagation();
-  b.querySelectorAll('button[data-t]').forEach(x => x.onclick = () => { out.textContent = runCheat(x.dataset.t); x.textContent = CHEAT[x.dataset.t] ? 'On' : 'Off'; sfx('ui'); });
-  b.querySelectorAll('button[data-c]').forEach(x => x.onclick = () => run(x.dataset.c));
-};
 // ---------- upgrades and base modules ----------
 const FAB = [
   { id: 'tank', name: 'Oxygen tank', max: 2, desc: 'More suit oxygen for longer spacewalks.', cost: l => l ? { ice: 10, scrap: 8 } : { ice: 6, scrap: 4 }, make: () => G.up.tank++ },
@@ -5470,14 +5415,14 @@ const FAB = [
   { id: 'plating', name: 'Hull plating', max: 3, desc: 'Stronger hull (+25).', cost: l => ({ ore: 12 + l * 6, scrap: 8 + l * 4 }), make: () => { G.up.plating++; G.ship.hullMax += 25; G.ship.hull += 25; } },
 ];
 const BUILD = [
-  { id: 'lantern', name: 'Lantern', desc: 'Bright light. The thing in the fog will not come near it.', cost: { glass: 2, ore: 2 } },
-  { id: 'extractor', name: 'Extractor', desc: 'Keeps digging resources from a nearby site.', cost: { ore: 6, scrap: 4 } },
-  { id: 'o2', name: 'Oxygen node', desc: 'Refills your suit oxygen nearby.', cost: { ice: 4, scrap: 2 } },
-  { id: 'shelter', name: 'Shelter pod', desc: 'A safe room. Nothing gets in. Refills oxygen.', cost: { ore: 10, scrap: 6, ice: 2 } },
-  { id: 'beacon', name: 'Beacon', desc: 'Marks this base on the helm map.', cost: { scrap: 3 } },
-  { id: 'floor', name: 'Floor plate', desc: '4 by 4 m deck plate.', cost: { ore: 2 } },
-  { id: 'wall', name: 'Wall panel', desc: '4 m wall section.', cost: { ore: 2 } },
-  { id: 'strut', name: 'Strut', desc: 'Support beam.', cost: { ore: 1 } },
+  { id: 'lantern', name: 'Lantern', desc: 'Bright light. The thing in the fog will not come near it.', cost: {} },
+  { id: 'extractor', name: 'Extractor', desc: 'Keeps digging resources from a nearby site.', cost: {} },
+  { id: 'o2', name: 'Oxygen node', desc: 'Refills your suit oxygen nearby.', cost: {} },
+  { id: 'shelter', name: 'Shelter pod', desc: 'A safe room. Nothing gets in. Refills oxygen.', cost: {} },
+  { id: 'beacon', name: 'Beacon', desc: 'Marks this base on the helm map.', cost: {} },
+  { id: 'floor', name: 'Floor plate', desc: '4 by 4 m deck plate.', cost: {} },
+  { id: 'wall', name: 'Wall panel', desc: '4 m wall section.', cost: {} },
+  { id: 'strut', name: 'Strut', desc: 'Support beam.', cost: {} },
 ];
 let MODM = null;
 function modMats() {
@@ -5643,7 +5588,7 @@ const G = {
       this.save();
     }, caught ? 1.8 : .6);
   },
-  caught() { if (this.dying || CHEAT.god) return; this.dying = true; sfx('caught'); loopTo('growl', 0, .05); loopTo('whisper', 0, .05); setTimeout(() => { this.dying = false; this.endEVA(true); }, 900); },
+  caught() { if (this.dying) return; this.dying = true; sfx('caught'); loopTo('growl', 0, .05); loopTo('whisper', 0, .05); setTimeout(() => { this.dying = false; this.endEVA(true); }, 900); },
 };
 function fade(fn, hold = .6) { const f = $('#fade'); f.style.opacity = 1; setTimeout(() => { fn(); setTimeout(() => f.style.opacity = 0, hold * 1000); }, 600); }
 function applyMined(dep) { const v = G.mined[dep.key]; if (v === undefined) { dep.amt = dep.max; dep.g.visible = true; dep.g.scale.setScalar(1); return; } dep.amt = v; dep.g.visible = v > 0; dep.g.scale.setScalar(.35 + .65 * v / dep.max); }
@@ -5709,10 +5654,10 @@ function updateInteriorLights() {
 function shipAxisClosest(p, out) { tmpV2.set(0, 3, -40); const a = SP.ship.localToWorld(tmpV2.clone()); tmpV2.set(0, 3, 960); const b = SP.ship.localToWorld(tmpV2.clone()); const ab = b.sub(a); const t = clamp(p.clone().sub(a).dot(ab) / ab.lengthSq(), 0, 1); return (out || new THREE.Vector3()).copy(a).addScaledVector(ab, t); }
 function updateFlight(dt, controlling) {
   const S = G.ship; const a = controlling ? moveAxis() : { x: 0, y: 0 };
-  const boost = false; const maxS = 110 * (CHEAT.fast ? 4 : 1);
+  const boost = false; const maxS = 110;
   const fwd = new THREE.Vector3(-Math.sin(S.yaw), 0, -Math.cos(S.yaw));
   let thr = -a.y; S.thr = lerp(S.thr, thr, dt * 2);
-  S.vel.addScaledVector(fwd, thr * 20 * (CHEAT.fast ? 4 : 1) * dt);
+  S.vel.addScaledVector(fwd, thr * 20 * dt);
   let vy = (controlling ? (IN.hold.up ? 1 : 0) - (IN.hold.down ? 1 : 0) : 0); S.vel.y += vy * 22 * dt;
   const turn = -a.x * .32; S.yaw += turn * dt * (1 - Math.min(.5, S.vel.length() / 300)); S.bank = lerp(S.bank, turn * .5 * Math.min(1, S.vel.length() / 25), dt * 2);
   // drag: lateral drift dies faster than forward motion
@@ -5746,7 +5691,7 @@ function updateGulpers(dt) {
   const S = G.ship; let hunted = false; const near = new THREE.Vector3();
   for (const g of SP.gulpers) {
     g.t += dt; g.cool -= dt; shipAxisClosest(g.pos, near); const d = near.distanceTo(g.pos);
-    const detect = (CHEAT.nomon ? 0 : 1) * SP.zone.detect * (1 - .2 * G.up.hush) * (G.state === 'eva' ? .4 : 1);
+    const detect = SP.zone.detect * (1 - .2 * G.up.hush) * (G.state === 'eva' ? .4 : 1);
     let target, speed;
     if (g.state === 'roam') { if (g.t > 22 || g.pos.distanceTo(g.wp) < 60) { g.t = 0; const stalk = Math.random() < .55; g.wp.copy(stalk ? S.pos : g.home).add(new THREE.Vector3((Math.random() - .5) * (stalk ? 900 : 1400), (Math.random() - .5) * (stalk ? 500 : 900), (Math.random() - .5) * (stalk ? 900 : 1400))); } target = g.wp; speed = 22; if (d < detect && g.cool <= 0 && G.inPlay()) { g.state = 'hunt'; g.lostT = 0; if (d < 1600) sfx('roar', .7); } }
     else if (g.state === 'hunt') { target = near; speed = 60 + Math.min(25, g.t * .5); hunted = true; if (d > detect * 1.3) { g.lostT += dt; if (g.lostT > 5) { g.state = 'roam'; g.t = 0; UI.toast('It lost us.'); } } else g.lostT = 0; if (d < 75) { g.state = 'flee'; g.t = 0; g.cool = 25; S.hull -= 14; sfx('hit'); sfx('roar', 1); G.shake = 1.6; S.vel.addScaledVector(near.clone().sub(g.pos).normalize(), 14); UI.toast('Something hit the ship!'); } }
@@ -5801,10 +5746,10 @@ function updateEVA(dt) {
   const E = G.e; if (!E) return; E.t += dt;
   const [dx, dy] = lookInput(); E.yaw -= dx; E.pitch = clamp(E.pitch - dy, -1.5, 1.5);
   camS.rotation.set(E.pitch, E.yaw, 0); const fwd = new THREE.Vector3(0, 0, -1).applyEuler(camS.rotation), right = new THREE.Vector3(1, 0, 0).applyEuler(camS.rotation);
-  const a = moveAxis(); const boost = false; const acc = 11 * (1 + .25 * G.up.thrust) * (CHEAT.fast ? 3 : 1);
+  const a = moveAxis(); const boost = false; const acc = 11 * (1 + .25 * G.up.thrust);
   const th = new THREE.Vector3().addScaledVector(fwd, -a.y).addScaledVector(right, a.x); th.y += (IN.hold.up ? 1 : 0) - (IN.hold.down ? 1 : 0);
   if (th.lengthSq() > 1) th.normalize(); E.vel.addScaledVector(th, acc * dt); E.vel.multiplyScalar(1 - Math.min(1, dt * .9));
-  const maxV = 12 * (1 + .25 * G.up.thrust) * (CHEAT.fast ? 3 : 1); if (E.vel.length() > maxV) E.vel.setLength(maxV);
+  const maxV = 12 * (1 + .25 * G.up.thrust); if (E.vel.length() > maxV) E.vel.setLength(maxV);
   E.pos.addScaledVector(E.vel, dt);
   loopTo('jet', th.lengthSq() > .01 ? (boost ? .22 : .12) : 0, .08);
   // collide with rocks and the hull
@@ -5895,7 +5840,7 @@ function drawCompass(target, E) {
   const v = `Airlock ${Math.round(d)} m${Math.abs(to.y) > 6 ? (to.y > 0 ? ', above' : ', below') : ''}`; const t = $('#cmpT'); if (t._v !== v) { t._v = v; t.textContent = v; }
 }
 function openBuildMenu() {
-  const b = UI.panel('Build', `<div style="color:#93a4aa;font-size:12px;margin-bottom:6px">Materials come from your suit cargo first, then the ship's stores.</div>` + BUILD.map((m, i) => `<div class="row"><div class="d">${m.name}<small>${m.desc}</small></div><span class="cost">${UI.costHtml(m.cost)}</span><button data-i="${i}" ${G.canPay(m.cost) ? '' : 'disabled'}>Choose</button></div>`).join(''), () => { if (!ghost) { G.building = false; G.refreshTouch(); } });
+  const b = UI.panel('Build', BUILD.map((m, i) => `<div class="row"><div class="d">${m.name}<small>${m.desc}</small></div><button data-i="${i}">Choose</button></div>`).join(''), () => { if (!ghost) { G.building = false; G.refreshTouch(); } });
   b.querySelectorAll('button[data-i]').forEach(btn => btn.onclick = () => { ghostType = +btn.dataset.i; ghostOff(); ghost = makeModule(BUILD[ghostType].id); ghost.traverse(o => { if (o.isMesh) o.material = modMats().ghostOk; if (o.isSprite) o.visible = false; }); SP.scene.add(ghost); G.ghostDist = 7; UI.closePanel(); G.building = true; G.refreshTouch(); });
 }
 function updateBuild(dt, fwd) {
@@ -5913,7 +5858,7 @@ function updateBuild(dt, fwd) {
   if (why) UI.warn(why); else UI.warn('');
   if (IN.take('fire') || IN.take('use')) {
     if (!ok) { sfx('deny'); UI.toast(why); }
-    else { G.pay(def.cost); placeBase(def.id, p.clone(), ghostRot); sfx('place'); UI.toast(def.name + ' built'); if (def.id === 'lantern' && G.q.stage === 6) G.setStage(7); if (def.id === 'extractor' && G.q.stage === 7) G.setStage(8); G.save(); if (!G.canPay(def.cost)) UI.toast('Out of materials for another ' + def.name, 2000); }
+    else { G.pay(def.cost); placeBase(def.id, p.clone(), ghostRot); sfx('place'); UI.toast(def.name + ' built'); if (def.id === 'lantern' && G.q.stage === 6) G.setStage(7); if (def.id === 'extractor' && G.q.stage === 7) G.setStage(8); G.save(); }
   }
   if (IN.take('remove')) {
     let best = null, bd = 9; for (const b of G.bases) { tmpV.copy(b.pos).sub(E.pos); const t = tmpV.dot(fwd); if (t < 0 || t > 10) continue; const dd = Math.sqrt(Math.max(0, tmpV.lengthSq() - t * t)); if (dd < 2.5 && t < bd) { bd = t; best = b; } }
@@ -5971,7 +5916,6 @@ function frame(now) {
   { const k = IN.keys, v = 650 * dt * IN.sens; if (k.ArrowLeft) IN.mx -= v; if (k.ArrowRight) IN.mx += v; if (k.ArrowUp) IN.my -= v * .7; if (k.ArrowDown) IN.my += v * .7; }
   updateWorldAnim(dt, t); updHeart(dt, t);
   if (st === 'cut') { updateCut(dt); return; }
-  if (run) cheatTick();
   if (st === 'title' || st === 'over') {
     titleT += dt; if (st === 'title') { const a = titleT * .05; SP.ship.position.set(0, 0, 0); SP.ship.rotation.set(0, 0, 0); SP.ship.updateMatrixWorld(); camS.position.set(Math.cos(a) * 1500 + 40, 260 + Math.sin(a * .7) * 120, Math.sin(a) * 1500 + 420); camS.lookAt(0, 0, 420); SP.scene.fog.density = .00008; if (window.DBG) { camS.position.copy(DBG.p); camS.lookAt(DBG.l); } }
     updateDust(camS.position, 160); R.clear(); renderSpace(); return;
