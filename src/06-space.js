@@ -1,6 +1,7 @@
 // ---------- the Depths: space scene, ship exterior, sites, decorations, creatures ----------
 const SP = { sites: [], decor: [], gulpers: [], drifters: [], solids: [], bases: [], lanternPool: [] };
-const FOG_COL = new THREE.Color(0xc4ccce);
+const FOG_EVA = new THREE.Color(0xc4ccce), FOG_SPACE = new THREE.Color(0x3a5056), WHITE_FOG = new THREE.Color(0xeef2f3);
+const FOG_COL = FOG_EVA.clone();
 let GLOW_TEX = null;
 function glowTex() { if (GLOW_TEX) return GLOW_TEX; const c = cv(128, 128), x = c.getContext('2d'); const g = x.createRadialGradient(64, 64, 0, 64, 64, 64); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(.18, 'rgba(255,255,255,.55)'); g.addColorStop(.5, 'rgba(255,255,255,.12)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 128, 128); GLOW_TEX = new THREE.CanvasTexture(c); return GLOW_TEX; }
 function glow(color, size, op) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), color, transparent: true, opacity: op || 1, blending: THREE.AdditiveBlending, depthWrite: false })); s.scale.set(size, size, 1); return s; }
@@ -45,15 +46,19 @@ void main(){vec3 d=normalize(vp);
     SP.dust = new THREE.Points(g, new THREE.PointsMaterial({ color: 0x9fb8bc, size: .5, transparent: true, opacity: .55, depthWrite: false, blending: THREE.AdditiveBlending, map: glowTex() })); SP.dust.frustumCulled = false; S.add(SP.dust); }
   // the edge of the Depths: a glowing bubble you cannot fly through
   SP.bubC = new THREE.Vector3(0, 0, -600); SP.bubR = 3000;
-  SP.bubble = new THREE.Mesh(new THREE.SphereGeometry(SP.bubR, 96, 48), new THREE.ShaderMaterial({ side: THREE.BackSide, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, depthTest: true, uniforms: { t: { value: 0 }, eva: { value: 0 }, cam: { value: new THREE.Vector3() }, ctr: { value: SP.bubC } },
-    vertexShader: 'varying vec3 wp;varying vec3 wn;void main(){vec4 w=modelMatrix*vec4(position,1.);wp=w.xyz;wn=normalize(mat3(modelMatrix)*normal);gl_Position=projectionMatrix*viewMatrix*w;gl_Position.z=gl_Position.w*.99999;}',
-    fragmentShader: `uniform float t;uniform float eva;uniform vec3 cam;uniform vec3 ctr;varying vec3 wp;varying vec3 wn;
-void main(){vec3 v=normalize(wp-cam);float f=pow(1.-abs(dot(v,wn)),3.);vec3 d=normalize(wp-ctr);
- float la=asin(d.y)*28.,lo=atan(d.z,d.x)*28.;vec2 q=vec2(lo+la*.5,la*.866);vec2 g=abs(fract(q)-.5);float hex=smoothstep(.43,.5,max(g.x,g.y));
- float dist=length(wp-cam);float near=max(smoothstep(2600.,250.,dist),.1);
- float wave=.5+.5*sin(la*.35+lo*.25-t*.8);
- float a=.015+f*.35+hex*(.02+near*.45)*(.35+.65*wave)+near*.03;
- gl_FragColor=eva>.5?vec4(vec3(.05,.35,.5),clamp(a*1.6,0.,.85)):vec4(vec3(.3,.78,.95)*a,1.);}` }));
+  // the edge of the Depths: a wall of white fog all around (outside it, everything is white)
+  SP.bubble = new THREE.Mesh(new THREE.SphereGeometry(SP.bubR, 96, 48), new THREE.ShaderMaterial({ side: THREE.BackSide, transparent: true, depthWrite: false, fog: false, uniforms: { t: { value: 0 }, trick: { value: 0 }, cam: { value: new THREE.Vector3() }, ctr: { value: SP.bubC }, R: { value: SP.bubR } },
+    vertexShader: 'uniform float trick;varying vec3 wp;void main(){vec4 w=modelMatrix*vec4(position,1.);wp=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;if(trick>.5)gl_Position.z=gl_Position.w*.99999;}',
+    fragmentShader: `uniform float t;uniform vec3 cam;uniform vec3 ctr;uniform float R;varying vec3 wp;
+float h(vec3 p){p=fract(p*.3183099+.1);p*=17.;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
+float n(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);return mix(mix(mix(h(i),h(i+vec3(1,0,0)),f.x),mix(h(i+vec3(0,1,0)),h(i+vec3(1,1,0)),f.x),f.y),mix(mix(h(i+vec3(0,0,1)),h(i+vec3(1,0,1)),f.x),mix(h(i+vec3(0,1,1)),h(i+vec3(1,1,1)),f.x),f.y),f.z);}
+float fb(vec3 p){float s=0.,a=.5;for(int i=0;i<5;i++){s+=a*n(p);p*=2.07;a*=.5;}return s;}
+void main(){vec3 d=normalize(wp-ctr);
+ float c=fb(d*5.+vec3(t*.012,0.,t*.008)), c2=fb(d*13.-vec3(0.,t*.02,0.));
+ float dist=length(wp-cam), near=smoothstep(R*1.2,R*.03,dist);
+ float a=clamp(.16+c*.3+c2*.1+near*.6,0.,.97);
+ vec3 col=mix(vec3(.80,.84,.86),vec3(.97,.98,.99),c);
+ gl_FragColor=vec4(col,a);}` }));
   SP.bubble.position.copy(SP.bubC); SP.bubble.renderOrder = 5; SP.bubble.frustumCulled = false; S.add(SP.bubble);
   buildShip();
   buildSites();

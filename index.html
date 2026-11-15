@@ -4622,7 +4622,8 @@ const Dialog = {
 };
 // ---------- the Depths: space scene, ship exterior, sites, decorations, creatures ----------
 const SP = { sites: [], decor: [], gulpers: [], drifters: [], solids: [], bases: [], lanternPool: [] };
-const FOG_COL = new THREE.Color(0xc4ccce);
+const FOG_EVA = new THREE.Color(0xc4ccce), FOG_SPACE = new THREE.Color(0x3a5056), WHITE_FOG = new THREE.Color(0xeef2f3);
+const FOG_COL = FOG_EVA.clone();
 let GLOW_TEX = null;
 function glowTex() { if (GLOW_TEX) return GLOW_TEX; const c = cv(128, 128), x = c.getContext('2d'); const g = x.createRadialGradient(64, 64, 0, 64, 64, 64); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(.18, 'rgba(255,255,255,.55)'); g.addColorStop(.5, 'rgba(255,255,255,.12)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 128, 128); GLOW_TEX = new THREE.CanvasTexture(c); return GLOW_TEX; }
 function glow(color, size, op) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex(), color, transparent: true, opacity: op || 1, blending: THREE.AdditiveBlending, depthWrite: false })); s.scale.set(size, size, 1); return s; }
@@ -4667,15 +4668,19 @@ void main(){vec3 d=normalize(vp);
     SP.dust = new THREE.Points(g, new THREE.PointsMaterial({ color: 0x9fb8bc, size: .5, transparent: true, opacity: .55, depthWrite: false, blending: THREE.AdditiveBlending, map: glowTex() })); SP.dust.frustumCulled = false; S.add(SP.dust); }
   // the edge of the Depths: a glowing bubble you cannot fly through
   SP.bubC = new THREE.Vector3(0, 0, -600); SP.bubR = 3000;
-  SP.bubble = new THREE.Mesh(new THREE.SphereGeometry(SP.bubR, 96, 48), new THREE.ShaderMaterial({ side: THREE.BackSide, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false, depthTest: true, uniforms: { t: { value: 0 }, eva: { value: 0 }, cam: { value: new THREE.Vector3() }, ctr: { value: SP.bubC } },
-    vertexShader: 'varying vec3 wp;varying vec3 wn;void main(){vec4 w=modelMatrix*vec4(position,1.);wp=w.xyz;wn=normalize(mat3(modelMatrix)*normal);gl_Position=projectionMatrix*viewMatrix*w;gl_Position.z=gl_Position.w*.99999;}',
-    fragmentShader: `uniform float t;uniform float eva;uniform vec3 cam;uniform vec3 ctr;varying vec3 wp;varying vec3 wn;
-void main(){vec3 v=normalize(wp-cam);float f=pow(1.-abs(dot(v,wn)),3.);vec3 d=normalize(wp-ctr);
- float la=asin(d.y)*28.,lo=atan(d.z,d.x)*28.;vec2 q=vec2(lo+la*.5,la*.866);vec2 g=abs(fract(q)-.5);float hex=smoothstep(.43,.5,max(g.x,g.y));
- float dist=length(wp-cam);float near=max(smoothstep(2600.,250.,dist),.1);
- float wave=.5+.5*sin(la*.35+lo*.25-t*.8);
- float a=.015+f*.35+hex*(.02+near*.45)*(.35+.65*wave)+near*.03;
- gl_FragColor=eva>.5?vec4(vec3(.05,.35,.5),clamp(a*1.6,0.,.85)):vec4(vec3(.3,.78,.95)*a,1.);}` }));
+  // the edge of the Depths: a wall of white fog all around (outside it, everything is white)
+  SP.bubble = new THREE.Mesh(new THREE.SphereGeometry(SP.bubR, 96, 48), new THREE.ShaderMaterial({ side: THREE.BackSide, transparent: true, depthWrite: false, fog: false, uniforms: { t: { value: 0 }, trick: { value: 0 }, cam: { value: new THREE.Vector3() }, ctr: { value: SP.bubC }, R: { value: SP.bubR } },
+    vertexShader: 'uniform float trick;varying vec3 wp;void main(){vec4 w=modelMatrix*vec4(position,1.);wp=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;if(trick>.5)gl_Position.z=gl_Position.w*.99999;}',
+    fragmentShader: `uniform float t;uniform vec3 cam;uniform vec3 ctr;uniform float R;varying vec3 wp;
+float h(vec3 p){p=fract(p*.3183099+.1);p*=17.;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
+float n(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);return mix(mix(mix(h(i),h(i+vec3(1,0,0)),f.x),mix(h(i+vec3(0,1,0)),h(i+vec3(1,1,0)),f.x),f.y),mix(mix(h(i+vec3(0,0,1)),h(i+vec3(1,0,1)),f.x),mix(h(i+vec3(0,1,1)),h(i+vec3(1,1,1)),f.x),f.y),f.z);}
+float fb(vec3 p){float s=0.,a=.5;for(int i=0;i<5;i++){s+=a*n(p);p*=2.07;a*=.5;}return s;}
+void main(){vec3 d=normalize(wp-ctr);
+ float c=fb(d*5.+vec3(t*.012,0.,t*.008)), c2=fb(d*13.-vec3(0.,t*.02,0.));
+ float dist=length(wp-cam), near=smoothstep(R*1.2,R*.03,dist);
+ float a=clamp(.16+c*.3+c2*.1+near*.6,0.,.97);
+ vec3 col=mix(vec3(.80,.84,.86),vec3(.97,.98,.99),c);
+ gl_FragColor=vec4(col,a);}` }));
   SP.bubble.position.copy(SP.bubC); SP.bubble.renderOrder = 5; SP.bubble.frustumCulled = false; S.add(SP.bubble);
   buildShip();
   buildSites();
@@ -5515,8 +5520,7 @@ function updateFlight(dt, controlling) {
   if (!controlling || Math.abs(thr) < .05) S.vel.multiplyScalar(1 - Math.min(1, dt * (controlling ? .25 : .6)));
   const sp = S.vel.length(); if (sp > maxS) S.vel.multiplyScalar(lerp(1, maxS / sp, dt * 2));
   S.pos.addScaledVector(S.vel, dt); S.speed = S.vel.length();
-  { const off = S.pos.clone().sub(SP.bubC), d = off.length(), R0 = SP.bubR - 380; G.atEdge = d > R0 - 200;
-    if (d > R0) { off.divideScalar(d); const out = S.vel.dot(off); if (out > 0) S.vel.addScaledVector(off, -out * Math.min(1, dt * 3)); S.vel.addScaledVector(off, -(d - R0) * .15 * dt); if (d > R0 + 200) S.pos.copy(SP.bubC).addScaledVector(off, R0 + 200); } }
+  { const off = S.pos.clone().sub(SP.bubC), d = off.length(); if (d > SP.bubR * 2.2) S.pos.copy(SP.bubC).addScaledVector(off, SP.bubR * 2.2 / d); }
   SP.ship.position.copy(S.pos); SP.ship.rotation.set(0, S.yaw, S.bank, 'YXZ'); SP.ship.updateMatrixWorld();
   // noise
   G.noise = clamp(S.speed / 80 * (1 - .3 * G.up.hush), 0, 1.6);
@@ -5725,7 +5729,7 @@ function drawMap() {
   if ((G.flags.samplesIn || 0) >= 3) for (const s of SP.sites) for (const d of s.deps) if (d.type === 'samples' && d.amt > 0) { const [px, py, e] = edge(...P(d.wp)); if (!e) { x.fillStyle = '#7af0a0'; x.beginPath(); x.arc(px, py, 2, 0, TAU); x.fill(); } }
   for (const b of G.bases) if (b.type === 'beacon') { const [px, py] = edge(...P(b.pos)); x.fillStyle = '#ff6a50'; x.beginPath(); x.arc(px, py, 3, 0, TAU); x.fill(); }
   if (G.q.stage >= 9) { const [px, py] = edge(...P(SP.lighthouse.p)); x.fillStyle = '#fff0c0'; x.beginPath(); x.arc(px, py, 4, 0, TAU); x.fill(); }
-  { const [bx, by] = P(SP.bubC); x.strokeStyle = 'rgba(90,200,240,.6)'; x.lineWidth = 2; x.beginPath(); x.arc(bx, by, (SP.bubR - 380) * sc, 0, TAU); x.stroke(); x.lineWidth = 1; }
+  { const [bx, by] = P(SP.bubC); x.strokeStyle = 'rgba(90,200,240,.6)'; x.lineWidth = 2; x.beginPath(); x.arc(bx, by, SP.bubR * sc, 0, TAU); x.stroke(); x.lineWidth = 1; }
   x.rotate(-S.yaw); x.fillStyle = '#e8f6f8'; x.beginPath(); x.moveTo(0, -8); x.lineTo(5, 6); x.lineTo(0, 3); x.lineTo(-5, 6); x.closePath(); x.fill();
   x.restore(); x.fillStyle = 'rgba(200,220,225,.6)'; x.font = '10px sans-serif'; x.fillText('N', W / 2 - 3, 11);
 }
@@ -5772,7 +5776,7 @@ function frame(now) {
       if (IN.take('view')) { G.view = G.view === 'out' ? 'bridge' : 'out'; sfx('ui'); }
       if (IN.take('use') || IN.take('leave')) G.leaveHelm();
       IN.take('bag') && UI.showBag();
-      if (G.hunted) { UI.warn('SOMETHING IS FOLLOWING THE SHIP'); setMood('dread'); } else { UI.warn(G.atEdge ? 'EDGE OF THE DEPTHS. TURN BACK.' : ''); setMood('helm'); }
+      if (G.hunted) { UI.warn('SOMETHING IS FOLLOWING THE SHIP'); setMood('dread'); } else { UI.warn(''); setMood('helm'); }
       if (G.state === 'helm') { let near = ''; for (const s of SP.sites) if (s.c.distanceTo(G.ship.pos) < 330) near = s.name; UI.prompt(near ? near + (G.ship.speed > 2.5 ? ' nearby. Stop the ship to go outside.' : '. Ship stopped. You can go out the airlock.') : ''); }
     }
     if (st === 'eva') updateEVA(dt);
@@ -5814,15 +5818,18 @@ function frame(now) {
 function renderSpace() {
   const c = camS.position, eva = G.state === 'eva', range = eva ? 520 : 6000; const far = eva ? 1200 : 9000;
   if (camS.far !== far) { camS.far = far; camS.updateProjectionMatrix(); }
-  SP.dome.scale.setScalar(far * .92); SP.dome.material.uniforms.fm.value = eva ? 1 : 0; SP.bubble.material.uniforms.eva.value = eva ? 1 : 0;
-  SP.bubble.material.uniforms.cam.value.copy(c); SP.bubble.material.uniforms.t.value = G.time;
+  SP.dome.scale.setScalar(far * .92); SP.dome.material.uniforms.fm.value = eva ? 1 : 0;
+  SP.bubble.material.uniforms.cam.value.copy(c); SP.bubble.material.uniforms.trick.value = eva ? 1 : 0; SP.bubble.material.uniforms.t.value = G.time;
   for (const d of SP.decor) d.g.visible = d.p.distanceTo(c) < range + d.r;
   for (const s of SP.sites) s.group.visible = s.c.distanceTo(c) < (eva ? range : 4000) + 200;
   for (const g of SP.gulpers) g.g.visible = g.pos.distanceTo(c) < range + 200;
   for (const j of SP.drifters) j.g.visible = j.g.position.distanceTo(c) < range;
   for (const b of G.bases || []) b.g.visible = b.pos.distanceTo(c) < (eva ? range : 1500);
   SP.dome.position.copy(c);
-  { const m = SP.bubble.material, bl = eva ? THREE.NormalBlending : THREE.AdditiveBlending; if (m.blending !== bl) { m.blending = bl; m.needsUpdate = true; } }
+  // past the fog wall you are blind: thick white fog
+  { const out = clamp((c.distanceTo(SP.bubC) - SP.bubR + 120) / 420, 0, 1); SP.scene.fog.color.copy(eva ? FOG_EVA : FOG_SPACE).lerp(WHITE_FOG, out); FOG_COL.copy(SP.scene.fog.color); SP.scene.background.copy(FOG_COL);
+    if (out > 0) { SP.scene.fog.density = Math.max(SP.scene.fog.density, out * .03); SP.dome.material.uniforms.fm.value = Math.max(SP.dome.material.uniforms.fm.value, out); }
+    SP.bubble.visible = out < 1; }
   R.render(SP.scene, camS);
 }
 // ---------- boot ----------

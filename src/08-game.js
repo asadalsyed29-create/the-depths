@@ -242,8 +242,7 @@ function updateFlight(dt, controlling) {
   if (!controlling || Math.abs(thr) < .05) S.vel.multiplyScalar(1 - Math.min(1, dt * (controlling ? .25 : .6)));
   const sp = S.vel.length(); if (sp > maxS) S.vel.multiplyScalar(lerp(1, maxS / sp, dt * 2));
   S.pos.addScaledVector(S.vel, dt); S.speed = S.vel.length();
-  { const off = S.pos.clone().sub(SP.bubC), d = off.length(), R0 = SP.bubR - 380; G.atEdge = d > R0 - 200;
-    if (d > R0) { off.divideScalar(d); const out = S.vel.dot(off); if (out > 0) S.vel.addScaledVector(off, -out * Math.min(1, dt * 3)); S.vel.addScaledVector(off, -(d - R0) * .15 * dt); if (d > R0 + 200) S.pos.copy(SP.bubC).addScaledVector(off, R0 + 200); } }
+  { const off = S.pos.clone().sub(SP.bubC), d = off.length(); if (d > SP.bubR * 2.2) S.pos.copy(SP.bubC).addScaledVector(off, SP.bubR * 2.2 / d); }
   SP.ship.position.copy(S.pos); SP.ship.rotation.set(0, S.yaw, S.bank, 'YXZ'); SP.ship.updateMatrixWorld();
   // noise
   G.noise = clamp(S.speed / 80 * (1 - .3 * G.up.hush), 0, 1.6);
@@ -452,7 +451,7 @@ function drawMap() {
   if ((G.flags.samplesIn || 0) >= 3) for (const s of SP.sites) for (const d of s.deps) if (d.type === 'samples' && d.amt > 0) { const [px, py, e] = edge(...P(d.wp)); if (!e) { x.fillStyle = '#7af0a0'; x.beginPath(); x.arc(px, py, 2, 0, TAU); x.fill(); } }
   for (const b of G.bases) if (b.type === 'beacon') { const [px, py] = edge(...P(b.pos)); x.fillStyle = '#ff6a50'; x.beginPath(); x.arc(px, py, 3, 0, TAU); x.fill(); }
   if (G.q.stage >= 9) { const [px, py] = edge(...P(SP.lighthouse.p)); x.fillStyle = '#fff0c0'; x.beginPath(); x.arc(px, py, 4, 0, TAU); x.fill(); }
-  { const [bx, by] = P(SP.bubC); x.strokeStyle = 'rgba(90,200,240,.6)'; x.lineWidth = 2; x.beginPath(); x.arc(bx, by, (SP.bubR - 380) * sc, 0, TAU); x.stroke(); x.lineWidth = 1; }
+  { const [bx, by] = P(SP.bubC); x.strokeStyle = 'rgba(90,200,240,.6)'; x.lineWidth = 2; x.beginPath(); x.arc(bx, by, SP.bubR * sc, 0, TAU); x.stroke(); x.lineWidth = 1; }
   x.rotate(-S.yaw); x.fillStyle = '#e8f6f8'; x.beginPath(); x.moveTo(0, -8); x.lineTo(5, 6); x.lineTo(0, 3); x.lineTo(-5, 6); x.closePath(); x.fill();
   x.restore(); x.fillStyle = 'rgba(200,220,225,.6)'; x.font = '10px sans-serif'; x.fillText('N', W / 2 - 3, 11);
 }
@@ -499,7 +498,7 @@ function frame(now) {
       if (IN.take('view')) { G.view = G.view === 'out' ? 'bridge' : 'out'; sfx('ui'); }
       if (IN.take('use') || IN.take('leave')) G.leaveHelm();
       IN.take('bag') && UI.showBag();
-      if (G.hunted) { UI.warn('SOMETHING IS FOLLOWING THE SHIP'); setMood('dread'); } else { UI.warn(G.atEdge ? 'EDGE OF THE DEPTHS. TURN BACK.' : ''); setMood('helm'); }
+      if (G.hunted) { UI.warn('SOMETHING IS FOLLOWING THE SHIP'); setMood('dread'); } else { UI.warn(''); setMood('helm'); }
       if (G.state === 'helm') { let near = ''; for (const s of SP.sites) if (s.c.distanceTo(G.ship.pos) < 330) near = s.name; UI.prompt(near ? near + (G.ship.speed > 2.5 ? ' nearby. Stop the ship to go outside.' : '. Ship stopped. You can go out the airlock.') : ''); }
     }
     if (st === 'eva') updateEVA(dt);
@@ -541,15 +540,18 @@ function frame(now) {
 function renderSpace() {
   const c = camS.position, eva = G.state === 'eva', range = eva ? 520 : 6000; const far = eva ? 1200 : 9000;
   if (camS.far !== far) { camS.far = far; camS.updateProjectionMatrix(); }
-  SP.dome.scale.setScalar(far * .92); SP.dome.material.uniforms.fm.value = eva ? 1 : 0; SP.bubble.material.uniforms.eva.value = eva ? 1 : 0;
-  SP.bubble.material.uniforms.cam.value.copy(c); SP.bubble.material.uniforms.t.value = G.time;
+  SP.dome.scale.setScalar(far * .92); SP.dome.material.uniforms.fm.value = eva ? 1 : 0;
+  SP.bubble.material.uniforms.cam.value.copy(c); SP.bubble.material.uniforms.trick.value = eva ? 1 : 0; SP.bubble.material.uniforms.t.value = G.time;
   for (const d of SP.decor) d.g.visible = d.p.distanceTo(c) < range + d.r;
   for (const s of SP.sites) s.group.visible = s.c.distanceTo(c) < (eva ? range : 4000) + 200;
   for (const g of SP.gulpers) g.g.visible = g.pos.distanceTo(c) < range + 200;
   for (const j of SP.drifters) j.g.visible = j.g.position.distanceTo(c) < range;
   for (const b of G.bases || []) b.g.visible = b.pos.distanceTo(c) < (eva ? range : 1500);
   SP.dome.position.copy(c);
-  { const m = SP.bubble.material, bl = eva ? THREE.NormalBlending : THREE.AdditiveBlending; if (m.blending !== bl) { m.blending = bl; m.needsUpdate = true; } }
+  // past the fog wall you are blind: thick white fog
+  { const out = clamp((c.distanceTo(SP.bubC) - SP.bubR + 120) / 420, 0, 1); SP.scene.fog.color.copy(eva ? FOG_EVA : FOG_SPACE).lerp(WHITE_FOG, out); FOG_COL.copy(SP.scene.fog.color); SP.scene.background.copy(FOG_COL);
+    if (out > 0) { SP.scene.fog.density = Math.max(SP.scene.fog.density, out * .03); SP.dome.material.uniforms.fm.value = Math.max(SP.dome.material.uniforms.fm.value, out); }
+    SP.bubble.visible = out < 1; }
   R.render(SP.scene, camS);
 }
 // ---------- boot ----------
