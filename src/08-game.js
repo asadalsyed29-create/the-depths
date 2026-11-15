@@ -182,7 +182,7 @@ const G = {
       this.save();
     }, caught ? 1.8 : .6);
   },
-  caught() { if (this.dying) return; this.dying = true; sfx('caught'); loopTo('growl', 0, .05); loopTo('whisper', 0, .05); setTimeout(() => { this.dying = false; this.endEVA(true); }, 900); },
+  caught() { if (this.dying || CHEAT.god) return; this.dying = true; sfx('caught'); loopTo('growl', 0, .05); loopTo('whisper', 0, .05); setTimeout(() => { this.dying = false; this.endEVA(true); }, 900); },
 };
 function fade(fn, hold = .6) { const f = $('#fade'); f.style.opacity = 1; setTimeout(() => { fn(); setTimeout(() => f.style.opacity = 0, hold * 1000); }, 600); }
 function applyMined(dep) { const v = G.mined[dep.key]; if (v === undefined) { dep.amt = dep.max; dep.g.visible = true; dep.g.scale.setScalar(1); return; } dep.amt = v; dep.g.visible = v > 0; dep.g.scale.setScalar(.35 + .65 * v / dep.max); }
@@ -248,10 +248,10 @@ function updateInteriorLights() {
 function shipAxisClosest(p, out) { tmpV2.set(0, 3, -40); const a = SP.ship.localToWorld(tmpV2.clone()); tmpV2.set(0, 3, 960); const b = SP.ship.localToWorld(tmpV2.clone()); const ab = b.sub(a); const t = clamp(p.clone().sub(a).dot(ab) / ab.lengthSq(), 0, 1); return (out || new THREE.Vector3()).copy(a).addScaledVector(ab, t); }
 function updateFlight(dt, controlling) {
   const S = G.ship; const a = controlling ? moveAxis() : { x: 0, y: 0 };
-  const boost = false; const maxS = 110;
+  const boost = false; const maxS = 110 * (CHEAT.fast ? 4 : 1);
   const fwd = new THREE.Vector3(-Math.sin(S.yaw), 0, -Math.cos(S.yaw));
   let thr = -a.y; S.thr = lerp(S.thr, thr, dt * 2);
-  S.vel.addScaledVector(fwd, thr * 20 * dt);
+  S.vel.addScaledVector(fwd, thr * 20 * (CHEAT.fast ? 4 : 1) * dt);
   let vy = (controlling ? (IN.hold.up ? 1 : 0) - (IN.hold.down ? 1 : 0) : 0); S.vel.y += vy * 22 * dt;
   const turn = -a.x * .32; S.yaw += turn * dt * (1 - Math.min(.5, S.vel.length() / 300)); S.bank = lerp(S.bank, turn * .5 * Math.min(1, S.vel.length() / 25), dt * 2);
   // drag: lateral drift dies faster than forward motion
@@ -285,7 +285,7 @@ function updateGulpers(dt) {
   const S = G.ship; let hunted = false; const near = new THREE.Vector3();
   for (const g of SP.gulpers) {
     g.t += dt; g.cool -= dt; shipAxisClosest(g.pos, near); const d = near.distanceTo(g.pos);
-    const detect = SP.zone.detect * (1 - .2 * G.up.hush) * (G.state === 'eva' ? .4 : 1);
+    const detect = (CHEAT.nomon ? 0 : 1) * SP.zone.detect * (1 - .2 * G.up.hush) * (G.state === 'eva' ? .4 : 1);
     let target, speed;
     if (g.state === 'roam') { if (g.t > 22 || g.pos.distanceTo(g.wp) < 60) { g.t = 0; const stalk = Math.random() < .55; g.wp.copy(stalk ? S.pos : g.home).add(new THREE.Vector3((Math.random() - .5) * (stalk ? 900 : 1400), (Math.random() - .5) * (stalk ? 500 : 900), (Math.random() - .5) * (stalk ? 900 : 1400))); } target = g.wp; speed = 22; if (d < detect && g.cool <= 0 && G.inPlay()) { g.state = 'hunt'; g.lostT = 0; if (d < 1600) sfx('roar', .7); } }
     else if (g.state === 'hunt') { target = near; speed = 60 + Math.min(25, g.t * .5); hunted = true; if (d > detect * 1.3) { g.lostT += dt; if (g.lostT > 5) { g.state = 'roam'; g.t = 0; UI.toast('It lost us.'); } } else g.lostT = 0; if (d < 75) { g.state = 'flee'; g.t = 0; g.cool = 25; S.hull -= 14; sfx('hit'); sfx('roar', 1); G.shake = 1.6; S.vel.addScaledVector(near.clone().sub(g.pos).normalize(), 14); UI.toast('Something hit the ship!'); } }
@@ -340,10 +340,10 @@ function updateEVA(dt) {
   const E = G.e; if (!E) return; E.t += dt;
   const [dx, dy] = lookInput(); E.yaw -= dx; E.pitch = clamp(E.pitch - dy, -1.5, 1.5);
   camS.rotation.set(E.pitch, E.yaw, 0); const fwd = new THREE.Vector3(0, 0, -1).applyEuler(camS.rotation), right = new THREE.Vector3(1, 0, 0).applyEuler(camS.rotation);
-  const a = moveAxis(); const boost = false; const acc = 11 * (1 + .25 * G.up.thrust);
+  const a = moveAxis(); const boost = false; const acc = 11 * (1 + .25 * G.up.thrust) * (CHEAT.fast ? 3 : 1);
   const th = new THREE.Vector3().addScaledVector(fwd, -a.y).addScaledVector(right, a.x); th.y += (IN.hold.up ? 1 : 0) - (IN.hold.down ? 1 : 0);
   if (th.lengthSq() > 1) th.normalize(); E.vel.addScaledVector(th, acc * dt); E.vel.multiplyScalar(1 - Math.min(1, dt * .9));
-  const maxV = 12 * (1 + .25 * G.up.thrust); if (E.vel.length() > maxV) E.vel.setLength(maxV);
+  const maxV = 12 * (1 + .25 * G.up.thrust) * (CHEAT.fast ? 3 : 1); if (E.vel.length() > maxV) E.vel.setLength(maxV);
   E.pos.addScaledVector(E.vel, dt);
   loopTo('jet', th.lengthSq() > .01 ? (boost ? .22 : .12) : 0, .08);
   // collide with rocks and the hull
@@ -510,6 +510,7 @@ function frame(now) {
   { const k = IN.keys, v = 650 * dt * IN.sens; if (k.ArrowLeft) IN.mx -= v; if (k.ArrowRight) IN.mx += v; if (k.ArrowUp) IN.my -= v * .7; if (k.ArrowDown) IN.my += v * .7; }
   updateWorldAnim(dt, t); updHeart(dt, t);
   if (st === 'cut') { updateCut(dt); return; }
+  if (run) cheatTick();
   if (st === 'title' || st === 'over') {
     titleT += dt; if (st === 'title') { const a = titleT * .05; SP.ship.position.set(0, 0, 0); SP.ship.rotation.set(0, 0, 0); SP.ship.updateMatrixWorld(); camS.position.set(Math.cos(a) * 1500 + 40, 260 + Math.sin(a * .7) * 120, Math.sin(a) * 1500 + 420); camS.lookAt(0, 0, 420); SP.scene.fog.density = .00008; if (window.DBG) { camS.position.copy(DBG.p); camS.lookAt(DBG.l); } }
     updateDust(camS.position, 160); R.clear(); renderSpace(); return;

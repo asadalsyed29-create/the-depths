@@ -131,11 +131,12 @@ const UI = {
   },
   pauseMenu() {
     if (this.blocking()) return;
-    const b = this.panel('Paused', `<div class="seg" style="flex-direction:column;align-items:stretch;gap:8px"><button id="pmR">Resume</button><button id="pmS">Save game</button><button id="pmO">Settings</button><button id="pmH">How to play</button><button id="pmQ">Save and quit to title</button></div>`);
+    const b = this.panel('Paused', `<div class="seg" style="flex-direction:column;align-items:stretch;gap:8px"><button id="pmR">Resume</button><button id="pmS">Save game</button><button id="pmO">Settings</button><button id="pmH">How to play</button><button id="pmC">Cheats</button><button id="pmQ">Save and quit to title</button></div>`);
     b.querySelector('#pmR').onclick = () => this.closePanel();
     b.querySelector('#pmS').onclick = () => { G.save(); this.toast('Game saved'); this.closePanel(); };
     b.querySelector('#pmO').onclick = () => { this.closePanel(); this.settings(); };
     b.querySelector('#pmH').onclick = () => { this.closePanel(); this.help(); };
+    b.querySelector('#pmC').onclick = () => { this.closePanel(); this.cheats(); };
     b.querySelector('#pmQ').onclick = () => { G.save(); this.closePanel(); G.toTitle(); };
   },
   settingsHtml() {
