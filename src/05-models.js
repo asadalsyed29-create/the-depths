@@ -3,11 +3,22 @@ const MD = {};
 function b64ToBuf(s) { const bin = atob(s); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u.buffer; }
 async function loadModels() {
   const L = new THREE.GLTFLoader(); const P = k => new Promise((res, rej) => L.parse(b64ToBuf(MODEL_DATA[k]), '', res, rej));
-  MD.soldier = await P('soldier'); MD.michelle = await P('michelle'); MD.xbot = await P('xbot');
+  MD.rpm = await P('rpm'); MD.michelle = await P('michelle'); MD.xbot = await P('xbot');
+  tposeRig(MD.rpm.scene);
   MD.clips = {}; for (const c of MD.xbot.animations) MD.clips[c.name] = c;
   // the crew rigs have different bone rolls, so bake each animation onto them through world space
   const want = ['idle', 'walk', 'agree', 'headShake', 'sad_pose'];
-  for (const k of ['soldier', 'michelle']) { MD[k].clips = {}; for (const n of want) MD[k].clips[n] = retargetClip(MD.xbot.scene, MD.clips[n], MD[k].scene, MD[k].animations); }
+  for (const k of ['rpm', 'michelle']) { MD[k].clips = {}; for (const n of want) MD[k].clips[n] = retargetClip(MD.xbot.scene, MD.clips[n], MD[k].scene, MD[k].animations); }
+}
+// the second crew rig rests in an A-pose; lift its arms out level so it matches the others
+function tposeRig(root) {
+  root.updateMatrixWorld(true); const l = boneByName(root, 'LeftUpLeg').getWorldPosition(new THREE.Vector3()).x > boneByName(root, 'RightUpLeg').getWorldPosition(new THREE.Vector3()).x ? 1 : -1;
+  for (const [s, sg] of [['Left', l], ['Right', -l]]) for (const [a, b] of [['Arm', 'ForeArm'], ['ForeArm', 'Hand'], ['Hand', 'HandMiddle1']]) {
+    const A = boneByName(root, s + a), B = boneByName(root, s + b); if (!A || !B) continue; root.updateMatrixWorld(true);
+    const d = B.getWorldPosition(new THREE.Vector3()).sub(A.getWorldPosition(new THREE.Vector3())).normalize(), want = new THREE.Vector3(sg, 0, 0);
+    const q = new THREE.Quaternion().setFromUnitVectors(d, want); A.parent.getWorldQuaternion(_q1); const w = _q1.clone().multiply(A.quaternion); A.quaternion.copy(_q1.clone().invert().multiply(q).multiply(w));
+  }
+  root.updateMatrixWorld(true);
 }
 function rigYaw(root) { root.updateMatrixWorld(true); const l = boneByName(root, 'LeftUpLeg').getWorldPosition(new THREE.Vector3()), r = boneByName(root, 'RightUpLeg').getWorldPosition(new THREE.Vector3()); return l.x > r.x ? 0 : Math.PI; }
 const _q1 = new THREE.Quaternion(), _q2 = new THREE.Quaternion(), _ax = new THREE.Vector3();
@@ -51,9 +62,49 @@ function retargetClip(srcScene, clip, tgtScene, tgtAnims) {
 }
 function boneByName(root, part) { let b = null; root.traverse(o => { if (o.isBone && !b && o.name.replace(/^mixamorig:?/, '') === part) b = o; }); return b; }
 function fitHeight(m, h) { m.updateMatrixWorld(true); const box = new THREE.Box3().setFromObject(m, true); const s = h / (box.max.y - box.min.y); m.scale.multiplyScalar(s); m.updateMatrixWorld(true); const b2 = new THREE.Box3().setFromObject(m, true); m.position.y -= b2.min.y; }
+// repaint a texture: fn(r,g,b) -> [r,g,b] or null to keep the pixel
+function repaint(tex, fn) {
+  const im = tex.image, c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const x = c.getContext('2d'); x.drawImage(im, 0, 0);
+  const d = x.getImageData(0, 0, c.width, c.height), p = d.data;
+  for (let i = 0; i < p.length; i += 4) { const o = fn(p[i] / 255, p[i + 1] / 255, p[i + 2] / 255); if (o) { p[i] = o[0] * 255; p[i + 1] = o[1] * 255; p[i + 2] = o[2] * 255; } }
+  x.putImageData(d, 0, 0); const t = new THREE.CanvasTexture(c); t.flipY = tex.flipY; t.colorSpace = tex.colorSpace; t.wrapS = tex.wrapS; t.wrapT = tex.wrapT; t.anisotropy = 4; return t;
+}
+const hexRGB = h => [(h >> 16 & 255) / 255, (h >> 8 & 255) / 255, (h & 255) / 255]; // sRGB, as painted on the texture
+// keep the cloth detail, swap its colour: brightness of the original times the new colour
+function dye(tex, col, k = 1.6, flat = 0) { const [r0, g0, b0] = hexRGB(col); return repaint(tex, (r, g, b) => { const l = Math.min(1.25, ((r * .3 + g * .59 + b * .11) * (1 - flat) + .42 * flat) * k); return [Math.min(1, r0 * l), Math.min(1, g0 * l), Math.min(1, b0 * l)]; }); }
+function hsv(r, g, b) { const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; let h = 0; if (d) { h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h *= 60; if (h < 0) h += 360; } return [h, mx ? d / mx : 0, mx]; }
 function makeCrew(o) {
-  const src = o.female ? MD.michelle : MD.soldier; const m = THREE.SkeletonUtils.clone(src.scene);
-  m.traverse(c => { if (c.isMesh) { c.frustumCulled = false; c.material = c.material.clone(); if (o.tint) c.material.color.lerp(new THREE.Color(o.tint), o.female ? .45 : .5); c.material.envMapIntensity = 1; } });
+  const src = o.female ? MD.michelle : MD.rpm; const m = THREE.SkeletonUtils.clone(src.scene);
+  m.traverse(c => { if (!c.isMesh) return; c.frustumCulled = false; const mt = c.material = c.material.clone(); mt.envMapIntensity = 1; const n = mt.name;
+    if (o.female) { // one atlas: trousers (yellow), skin (brown), trims (red), hair (near black)
+      if (mt.map) { const [pr, pg, pb] = hexRGB(o.pants), [ar, ag, ab] = hexRGB(o.trim), [sr, sg, sb] = hexRGB(o.skin), [hr, hg, hb] = hexRGB(o.hair || 0x222222);
+        mt.map = repaint(mt.map, (r, g, b) => { const [h, s, v] = hsv(r, g, b);
+          if (h > 38 && h < 75 && s > .35 && v > .35) { const l = v * 1.1; return [pr * l, pg * l, pb * l]; }
+          if ((h < 14 || h > 335) && s > .55 && v > .3) { const l = v * 1.2; return [ar * l, ag * l, ab * l]; }
+          if (h >= 8 && h <= 38 && s > .2 && s < .75 && v > .12) { const l = v / .45; return [Math.min(1, sr * l), Math.min(1, sg * l), Math.min(1, sb * l)]; }
+          if (v < .2 && s < .5) { const l = v / .12; return [Math.min(1, hr * l), Math.min(1, hg * l), Math.min(1, hb * l)]; }
+          return null; }); }
+    } else {
+      if (n === 'Wolf3D_Outfit_Top' && mt.map) mt.map = dye(mt.map, o.top, 1.6, .7);
+      else if (n === 'Wolf3D_Outfit_Bottom' && mt.map) mt.map = dye(mt.map, o.bottom, 1.6, .5);
+      else if (n === 'Wolf3D_Outfit_Footwear' && mt.map) mt.map = dye(mt.map, o.shoes || 0x2a2a2a, 1.3);
+      else if (n === 'Wolf3D_Skin' || n === 'Wolf3D_Body') mt.color.set(o.skin);
+      else if (n === 'Wolf3D_Headwear') c.visible = false; // a hat; hair is added below
+      else if (n === 'Wolf3D_Beard') { mt.color.set(o.hair); c.visible = !!o.beard; }
+    } });
+  if (!o.female && !o.bald) { // short hair: a thin shell fitted to the top of the skull, following the head bone
+    m.updateMatrixWorld(true); let hm = null; m.traverse(c => { if (c.isMesh && c.material.name === 'Wolf3D_Skin') hm = c; });
+    const pa = hm.geometry.attributes.position, v = new THREE.Vector3(), pts = []; let y0 = 1e9, y1 = -1e9;
+    for (let i = 0; i < pa.count; i++) { v.fromBufferAttribute(pa, i).applyMatrix4(hm.matrixWorld); pts.push(v.clone()); y0 = Math.min(y0, v.y); y1 = Math.max(y1, v.y); }
+    const hy = y1 - (y1 - y0) * .24, bb = new THREE.Box3(); for (const p of pts) if (p.y > hy) bb.expandByPoint(p);
+    const rx = (bb.max.x - bb.min.x) / 2, rz = (bb.max.z - bb.min.z) / 2, R = Math.max(rx, rz), ry = (y1 - hy) * 1.0;
+    const c = new THREE.Vector3((bb.min.x + bb.max.x) / 2, y1 - ry, (bb.min.z + bb.max.z) / 2);
+    const head = boneByName(m, 'Head'); const ws = head.getWorldScale(new THREE.Vector3());
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 18, 0, TAU, 0, o.long ? 2.0 : 1.62), new THREE.MeshStandardMaterial({ color: o.hair, roughness: .9 }));
+    // the shell sits lower at the back than the front (a hairline)
+    const g2 = new THREE.Group(); g2.position.copy(head.worldToLocal(c.clone())); head.add(g2); g2.quaternion.copy(head.getWorldQuaternion(new THREE.Quaternion()).invert());
+    cap.scale.set(rx * 1.07 / ws.x, ry * 1.08 / ws.y, rz * 1.07 / ws.z); cap.rotation.x = -.3 * (rigYaw(m) ? -1 : 1); cap.position.z = 0; g2.add(cap);
+  }
   m.rotation.y = -rigYaw(m); const g = new THREE.Group(); g.add(m); fitHeight(m, 1.76 * (o.tall || 1)); if (o.wide) { m.scale.x *= o.wide; m.scale.z *= o.wide; }
   const mixer = new THREE.AnimationMixer(m); const act = {};
   for (const k in src.clips) act[k] = mixer.clipAction(src.clips[k]);

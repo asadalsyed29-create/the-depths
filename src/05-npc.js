@@ -1,12 +1,12 @@
 // ---------- crew members ----------
 const NPCS = [
-  { id: 'varga', name: 'Ilse Varga', role: 'Navigator', x: -4.6, z: -29.5, yaw: .6, look: { female: 1, tint: 0x6a86b0 } },
-  { id: 'okafor', name: 'Tomas Okafor', role: 'Chief Engineer', x: -5.5, z: 30.5, yaw: 1.2, look: { tint: 0xd08850, wide: 1.08 } },
-  { id: 'hartley', name: 'Dr. Mei Hartley', role: 'Medical Officer', x: 7.5, z: -18.5, yaw: -1.2, look: { female: 1, tint: 0xffffff, tall: .97 } },
-  { id: 'benny', name: 'Benny Salas', role: 'Cook', x: -8, z: .5, yaw: Math.PI, look: { tint: 0xe8e2d4, wide: 1.15, tall: .97 }, path: [[-8, .3], [-5.5, .3]] },
-  { id: 'pryce', name: 'Dr. Anwen Pryce', role: 'Xenobiologist', x: 8.6, z: -5, yaw: -1.5, look: { female: 1, tint: 0x9ad0b0, tall: 1.02 } },
-  { id: 'rook', name: 'Hal Rook', role: 'Quartermaster', x: -5, z: 8.5, yaw: -1.2, look: { tint: 0xb09070, wide: 1.05 } },
-  { id: 'pell', name: 'Pell Arden', role: 'Hydroponics', x: -7.5, z: 19, yaw: 1.6, look: { tint: 0x80b8a8, tall: .95 } },
+  { id: 'varga', name: 'Ilse Varga', role: 'Navigator', x: -4.6, z: -29.5, yaw: .6, look: { female: 1, pants: 0x2a3550, trim: 0xd8dde0, skin: 0xc89a78, hair: 0x5a3a22, tall: 1.03 } },
+  { id: 'okafor', name: 'Tomas Okafor', role: 'Chief Engineer', x: -5.5, z: 30.5, yaw: 1.2, look: { top: 0xc8641e, bottom: 0x8a4a1a, skin: 0x5a3828, hair: 0x141210, wide: 1.08 } },
+  { id: 'hartley', name: 'Dr. Mei Hartley', role: 'Medical Officer', x: 7.5, z: -18.5, yaw: -1.2, look: { female: 1, pants: 0xe4e6e8, trim: 0x3aa0a8, skin: 0xe8c4a4, hair: 0x101010, tall: .95 } },
+  { id: 'benny', name: 'Benny Salas', role: 'Cook', x: -8, z: .5, yaw: Math.PI, look: { top: 0xeeeae2, bottom: 0x3a3a3e, skin: 0xa8866e, hair: 0x2a1c12, beard: 1, wide: 1.16, tall: .97 }, path: [[-8, .3], [-5.5, .3]] },
+  { id: 'pryce', name: 'Dr. Anwen Pryce', role: 'Xenobiologist', x: 8.6, z: -5, yaw: -1.5, look: { female: 1, pants: 0x2e5a3a, trim: 0xe08a30, skin: 0xf0d0b8, hair: 0x8a3a18, tall: 1.0 } },
+  { id: 'rook', name: 'Hal Rook', role: 'Quartermaster', x: -5, z: 8.5, yaw: -1.2, look: { top: 0x55603a, bottom: 0x2e3428, skin: 0xe2b896, hair: 0x9a948a, beard: 1, wide: 1.05, tall: 1.03 } },
+  { id: 'pell', name: 'Pell Arden', role: 'Hydroponics', x: -7.5, z: 19, yaw: 1.6, look: { top: 0x3e7a52, bottom: 0x6a5238, skin: 0xdcbca8, hair: 0xa8541e, tall: .96 } },
 ];
 function buildNPCs() {
   for (const n of NPCS) {
