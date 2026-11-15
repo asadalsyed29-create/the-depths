@@ -64,15 +64,33 @@ const G = {
     this.up = { tank: 0, pack: 0, thrust: 0, lamp: 0, hush: 0, plating: 0 };
     this.ship = { pos: new THREE.Vector3(0, 0, 0), yaw: 0, vel: new THREE.Vector3(), speed: 0, hull: 62, hullMax: 100, bank: 0, thr: 0 };
     this.q = { stage: 0, n: 0 }; this.flags = {}; this.bases = []; this.mined = {}; this.time = 0; this.evaCount = 0;
+    this.zone = 'depths'; this.zd = { depths: { frags: [] }, abyss: { frags: [] }, heart: { frags: [] } };
   },
-  setStage(s) { this.q.stage = s; this.q.n = 0; sfx('beep2'); UI.toast('New objective'); this.updObjective(); this.save(); },
+  setStage(s) { this.q.stage = s; this.q.n = 0; sfx('beep2'); UI.toast('New objective'); this.updObjective(); this.save(); if (s === 10 || s === 13) this.fragCheck(); if (s === 16) { this.q.n = updPillars(); this.updObjective(); } },
+  fragCheck() { if ((this.q.stage === 10 || this.q.stage === 13) && fragsHave() >= fragsNeed()) this.setStage(this.q.stage + 1); else this.updObjective(); },
+  // move everything belonging to this bubble into storage and bring up another one
+  zoneData() { return { bases: this.bases.map(b => ({ type: b.type, p: b.p, ry: b.ry, store: b.store || 0, acc: b.acc || 0, site: b.site })), mined: this.mined, known: SP.sites.filter(x => x.known).map(x => x.i), frags: (this.zd[this.zone] || {}).frags || [] }; },
+  switchZone(id) {
+    this.zd[this.zone] = this.zoneData(); for (const b of this.bases) SP.scene.remove(b.g); this.bases = [];
+    buildZone(id); this.zone = id; this.enterZoneData(this.zd[id] || { frags: [] });
+  },
+  enterZoneData(z) {
+    this.zd[this.zone] = z; z.frags = z.frags || []; this.mined = z.mined || {}; for (const s of SP.sites) for (const dep of s.deps) applyMined(dep);
+    for (const s of SP.sites) s.known = s.i < 1; for (const i of z.known || []) if (SP.sites[i]) SP.sites[i].known = true;
+    for (const b of z.bases || []) placeBase(b.type, new THREE.Vector3().fromArray(b.p), b.ry, b, true);
+    applyFrags(); if (SP.zone.heart) updPillars();
+  },
   updObjective() {
     const s = this.q.stage; const T = [
       'Talk to Navigator Varga on the Bridge.', 'Take the helm on the Bridge and fly to the rock field ahead.', 'Stop the ship. Go to the Suit Room and out through the airlock.',
       `Mine ore from the rocks. (${Math.min(this.q.n, 8)}/8)`, 'Come back inside and ask Chief Okafor in Engineering to repair the hull.', 'Ask Quartermaster Rook in the Cargo Hold about building bases.',
       'Go outside and build a Lantern at a site.', 'Build an Extractor near a site.', `Find strange samples for Dr. Pryce in the Xeno Lab. Wrecks and deepglass gardens have them. (${Math.min(G.flags.samplesIn || 0, 3)}/3 studied)`,
-      'Find the lighthouse deep in the Depths, far to the north-east.', 'Keep exploring the Depths. Build bases, upgrade the ship and survive.'];
-    UI.objective(T[s] || T[10]);
+      'Find the lighthouse deep in the Depths, far to the north-east.',
+      `Find the Hyperspeed Dash Core fragments. One is hidden inside every structure in the Depths. (${fragsHave()}/${fragsNeed()})`, 'Assemble the Hyperspeed Dash Core at the fabricator in the Workshop.', 'Take the core to Chief Okafor in Engineering and install it.',
+      `The Abyss. Find the core fragments hidden inside its structures. (${fragsHave()}/${fragsNeed()})`, 'Assemble the second core at the fabricator in the Workshop.', 'Ask Chief Okafor to install the second core.',
+      `Light the three anchor pillars. Build a Beacon next to each one. (${Math.min(3, this.q.n)}/3)`, `Bring Dr. Pryce samples from the Heart. (${Math.min(4, G.flags.heartS || 0)}/4)`, 'Ask Chief Okafor to brace the hull for the Heart.', 'Fly the ship into the Heart at the centre of the bubble.',
+      'The bubbles are open. Use Dash at the helm to travel to any bubble. Keep exploring, building and surviving.'];
+    UI.objective(T[s] || T[20]);
   },
   applySettings() {
     const s = this.set; this.mode = s.mode; document.body.classList.toggle('mobile', s.mode === 'mobile'); IN.sens = s.sens;
@@ -83,13 +101,13 @@ const G = {
     this.refreshTouch(); UI.hint();
   },
   refreshTouch() {
-    const show = this.mode === 'mobile' && this.inPlay() && !this.paused; $('#touch').classList.toggle('hidden', !show);
+    const show = this.mode === 'mobile' && this.inPlay() && !this.paused && this.state !== 'cut'; $('#touch').classList.toggle('hidden', !show);
     if (show) UI.touchSet(this.state === 'eva' && this.building ? 'build' : this.state);
   },
   // ---- save / load ----
   save() {
-    if (!this.inPlay()) return; const s = this.ship;
-    const d = { v: 1, res: this.res, p: { hp: this.p.hp, flares: this.p.flares, cargo: this.p.cargo }, up: this.up, ship: { pos: s.pos.toArray(), yaw: s.yaw, hull: s.hull, hullMax: s.hullMax }, q: this.q, flags: this.flags, bases: this.bases.map(b => ({ type: b.type, p: b.p, ry: b.ry, store: b.store || 0, acc: b.acc || 0, site: b.site })), mined: this.mined, known: SP.sites.filter(x => x.known).map(x => x.i), time: this.time, evaCount: this.evaCount };
+    if (!this.inPlay() || this.state === 'cut') return; const s = this.ship; this.zd[this.zone] = this.zoneData();
+    const d = { v: 1, res: this.res, p: { hp: this.p.hp, flares: this.p.flares, cargo: this.p.cargo }, up: this.up, ship: { pos: s.pos.toArray(), yaw: s.yaw, hull: s.hull, hullMax: s.hullMax }, q: this.q, flags: this.flags, zone: this.zone, zd: this.zd, time: this.time, evaCount: this.evaCount };
     try { localStorage.setItem('thedepths-save', JSON.stringify(d)); } catch (e) { }
   },
   hasSave() { try { return !!localStorage.getItem('thedepths-save'); } catch (e) { return false; } },
@@ -98,12 +116,12 @@ const G = {
     this.newState(); Object.assign(this.res, d.res); this.p.hp = d.p.hp; this.p.flares = d.p.flares; Object.assign(this.p.cargo, d.p.cargo || {}); Object.assign(this.up, d.up);
     this.ship.pos.fromArray(d.ship.pos); this.ship.yaw = d.ship.yaw; this.ship.hull = d.ship.hull; this.ship.hullMax = d.ship.hullMax;
     this.q = d.q; this.flags = d.flags || {}; this.time = d.time || 0; this.evaCount = d.evaCount || 0;
-    this.mined = d.mined || {}; for (const s of SP.sites) for (const dep of s.deps) applyMined(dep);
-    for (const i of d.known || []) if (SP.sites[i]) SP.sites[i].known = true;
-    for (const b of d.bases || []) placeBase(b.type, new THREE.Vector3().fromArray(b.p), b.ry, b, true);
+    if (d.zd) { this.zd = d.zd; this.zone = d.zone || 'depths'; } else { this.zone = 'depths'; this.zd.depths = { bases: d.bases || [], mined: d.mined || {}, known: d.known || [], frags: [] }; }
+    for (const k of ZONE_ORDER) this.zd[k] = this.zd[k] || { frags: [] };
+    if (SP.zone.id !== this.zone) buildZone(this.zone); this.enterZoneData(this.zd[this.zone]);
     this.p.x = 0; this.p.z = -30; this.p.yaw = Math.PI; return true;
   },
-  resetWorld() { for (const b of this.bases || []) SP.scene.remove(b.g); this.bases = []; for (const s of SP.sites) { s.known = s.i < 1; for (const dep of s.deps) { dep.amt = dep.max; dep.g.visible = true; dep.g.scale.setScalar(1); } } },
+  resetWorld() { for (const b of this.bases || []) SP.scene.remove(b.g); this.bases = []; if (SP.zone.id !== 'depths') buildZone('depths'); for (const s of SP.sites) { s.known = s.i < 1; if (s.frag) s.frag.g.visible = true; for (const dep of s.deps) { dep.amt = dep.max; dep.g.visible = true; dep.g.scale.setScalar(1); } } },
   start(cont) {
     auInit(); this.resetWorld();
     if (!(cont && this.load())) { this.newState(); }
@@ -144,7 +162,7 @@ const G = {
     fade(() => {
       this.state = 'eva'; this.evaCount++; setMood('eva'); const E = this.e = { pos: SP.ship.localToWorld(SP.airlockLocal.clone()), vel: new THREE.Vector3(), yaw: this.ship.yaw - Math.PI / 2, pitch: 0, o2: this.o2Max(), t: 0, mineT: 0, breathT: 0, heartT: 0, flares: [], warnT: 0 };
       E.vel.set(Math.cos(this.ship.yaw), 0, -Math.sin(this.ship.yaw)).multiplyScalar(2);
-      G.flares = []; const P = SP.pale; P.on = false; P.spawnAt = 5; P.state = 'none';
+      G.flares = []; const P = SP.pale; P.on = false; P.spawnAt = SP.zone.pale.spawn; P.state = 'none';
       SP.suitLamp.intensity = this.up.lamp ? 20 : 13; $('#cross').classList.remove('hidden'); $('#compass').classList.remove('hidden'); $('#map').classList.add('hidden');
       loopTo('wind', .25, 1); this.refreshTouch(); if (this.q.stage === 2) this.setStage(3);
       UI.toast(this.mode === 'pc' ? 'Hold the left mouse button on glowing rocks to mine. B to build.' : 'Hold Use on glowing rocks to mine. Build to place base parts.', 4000);
@@ -259,14 +277,15 @@ function updateFlight(dt, controlling) {
   // discover sites
   for (const s of SP.sites) if (!s.known && s.c.distanceTo(S.pos) < 1100) { s.known = true; UI.toast('Found: ' + s.name); sfx('ping'); }
   if (G.q.stage === 1 && SP.sites[0].c.distanceTo(S.pos) < 700) G.setStage(2);
-  if (G.q.stage === 9 && SP.lighthouse.p.distanceTo(S.pos) < 800) { G.setStage(10); setTimeout(() => lighthouseStory(), 600); }
+  if (G.q.stage === 19 && SP.heart && SP.bubC.distanceTo(S.pos) < 470) { G.q.stage = 19.5; heartEnding(); }
+  if (G.q.stage === 9 && SP.lighthouse && SP.lighthouse.p.distanceTo(S.pos) < 800) { G.setStage(10); setTimeout(() => lighthouseStory(), 600); }
   if (S.hull <= 0 && G.state !== 'over') gameOver();
 }
 function updateGulpers(dt) {
   const S = G.ship; let hunted = false; const near = new THREE.Vector3();
   for (const g of SP.gulpers) {
     g.t += dt; g.cool -= dt; shipAxisClosest(g.pos, near); const d = near.distanceTo(g.pos);
-    const detect = 380 * (1 - .2 * G.up.hush) * (G.state === 'eva' ? .4 : 1);
+    const detect = SP.zone.detect * (1 - .2 * G.up.hush) * (G.state === 'eva' ? .4 : 1);
     let target, speed;
     if (g.state === 'roam') { if (g.t > 22 || g.pos.distanceTo(g.wp) < 60) { g.t = 0; const stalk = Math.random() < .55; g.wp.copy(stalk ? S.pos : g.home).add(new THREE.Vector3((Math.random() - .5) * (stalk ? 900 : 1400), (Math.random() - .5) * (stalk ? 500 : 900), (Math.random() - .5) * (stalk ? 900 : 1400))); } target = g.wp; speed = 22; if (d < detect && g.cool <= 0 && G.inPlay()) { g.state = 'hunt'; g.lostT = 0; if (d < 1600) sfx('roar', .7); } }
     else if (g.state === 'hunt') { target = near; speed = 60 + Math.min(25, g.t * .5); hunted = true; if (d > detect * 1.3) { g.lostT += dt; if (g.lostT > 5) { g.state = 'roam'; g.t = 0; UI.toast('It lost us.'); } } else g.lostT = 0; if (d < 75) { g.state = 'flee'; g.t = 0; g.cool = 25; S.hull -= 14; sfx('hit'); sfx('roar', 1); G.shake = 1.6; S.vel.addScaledVector(near.clone().sub(g.pos).normalize(), 14); UI.toast('Something hit the ship!'); } }
@@ -304,7 +323,8 @@ function placeBase(type, pos, ry, src, silent) {
   let site = src && src.site !== undefined ? src.site : null; if (site === null) { let bd = 1e9; for (const s of SP.sites) { const d = s.c.distanceTo(pos); if (d < bd) { bd = d; site = s.i; } } }
   const b = { type, p: pos.toArray(), ry, g, store: src ? src.store || 0 : 0, acc: src ? src.acc || 0 : 0, site, pos: pos.clone() };
   if (type === 'beacon' || type === 'extractor' || type === 'lantern' || type === 'shelter') SP.sites[site] && (SP.sites[site].base = true);
-  G.bases.push(b); return b;
+  G.bases.push(b); if (type === 'beacon' && SP.zone.heart && !silent) { const n = updPillars(); if (G.q.stage === 16) { G.q.n = n; G.updObjective(); if (n >= 3) G.setStage(17); } else if (n) UI.toast('The pillar lights up.'); }
+  return b;
 }
 function nearestSite(p) { let best = null, bd = 1e9; for (const s of SP.sites) { const d = s.c.distanceTo(p); if (d < bd) { bd = d; best = s; } } return [best, bd]; }
 function rayDeposit(o, dir, range) {
@@ -331,6 +351,7 @@ function updateEVA(dt) {
   { const lp0 = SP.ship.worldToLocal(E.pos.clone()); let hitAny = false; for (const b of SP.shipBoxes) { const pad = .5; const rz = b[6] || 0, cz = Math.cos(-rz), sz = Math.sin(-rz); const lp = rz ? new THREE.Vector3(lp0.x * cz - (lp0.y - 3) * sz, lp0.x * sz + (lp0.y - 3) * cz + 3, lp0.z) : lp0.clone(); if (lp.x > b[0] - pad && lp.x < b[3] + pad && lp.y > b[1] - pad && lp.y < b[4] + pad && lp.z > b[2] - pad && lp.z < b[5] + pad) { const o = [lp.x - (b[0] - pad), (b[3] + pad) - lp.x, lp.y - (b[1] - pad), (b[4] + pad) - lp.y, lp.z - (b[2] - pad), (b[5] + pad) - lp.z]; const m = Math.min(...o), i = o.indexOf(m); if (i === 0) lp.x = b[0] - pad; else if (i === 1) lp.x = b[3] + pad; else if (i === 2) lp.y = b[1] - pad; else if (i === 3) lp.y = b[4] + pad; else if (i === 4) lp.z = b[2] - pad; else lp.z = b[5] + pad; if (rz) { const c2 = Math.cos(rz), s2 = Math.sin(rz), y3 = lp.y - 3; lp.set(lp.x * c2 - y3 * s2, lp.x * s2 + y3 * c2 + 3, lp.z); } lp0.copy(lp); hitAny = true; E.vel.multiplyScalar(.5); } }
     { const rl = lp0.clone().sub(new THREE.Vector3(0, 3, 470)); const q = Math.hypot(rl.x, rl.y), d2 = Math.hypot(q - 250, rl.z); if (d2 < 17 && q > 1) { const n = new THREE.Vector3(rl.x / q * (q - 250), rl.y / q * (q - 250), rl.z).normalize(); const fix = n.multiplyScalar(17); const base = new THREE.Vector3(rl.x / q * 250, rl.y / q * 250, 0); lp0.copy(base.add(fix)).add(new THREE.Vector3(0, 3, 470)); hitAny = true; } }
     if (hitAny) E.pos.copy(SP.ship.localToWorld(lp0)); }
+  checkFragments(E, dt);
   camS.position.copy(E.pos); camS.position.y += Math.sin(E.t * 1.3) * .03;
   SP.suitLamp.position.copy(camS.position).addScaledVector(right, .3).y -= .2; SP.suitLamp.target.position.copy(camS.position).addScaledVector(fwd, 10);
   // fog thickens around you outside
@@ -385,7 +406,7 @@ function updatePale(dt, E, fwd, prox) {
   P.fade = Math.min(1, (P.fade || 0) + dt / 5); for (const m of P.mats) m.opacity = P.fade * P.fade * (3 - 2 * P.fade); if (P.aura) P.aura.material.opacity = .16 * P.fade;
   P.t += dt; const toP = E.pos.clone().sub(P.pos); const d = toP.length(); toP.divideScalar(d || 1);
   const seen = fwd.dot(toP.clone().negate()) > Math.cos(.38) && d < 45;
-  let speed = (1.4 + Math.min(3.6, P.t * .045)) * (G.up.lamp ? .75 : 1) * (seen ? .45 : 1);
+  let speed = SP.zone.pale.speed * (1.4 + Math.min(3.6, P.t * .045)) * (G.up.lamp ? .75 : 1) * (seen ? .45 : 1);
   const safe = safeZone(E.pos);
   if (P.state === 'flee') { P.fleeT += dt; P.pos.addScaledVector(toP, -7 * dt); if (P.fleeT > 9) { P.state = 'approach'; P.t = Math.min(P.t, 20); } }
   else if (safe) { const ds = P.pos.distanceTo(safe); const keep = 20; if (ds > keep + 1) P.pos.addScaledVector(toP, speed * dt); else { const side = new THREE.Vector3(-toP.z, 0, toP.x); P.pos.addScaledVector(side, dt * 1.2); P.pos.addScaledVector(P.pos.clone().sub(safe).normalize(), (keep - ds) * dt); } P.safeT = (P.safeT || 0) + dt; if (P.safeT > 30) { P.on = false; g.visible = false; P.spawnAt = E.t + 20 + Math.random() * 15; P.safeT = 0; } }
@@ -449,15 +470,17 @@ function drawMap() {
   const edge = (px, py) => { const l = Math.hypot(px, py), m = W / 2 - 6; return l > m ? [px / l * m, py / l * m, true] : [px, py, false]; };
   for (const s of SP.sites) { if (!s.known) continue; let [px, py, e] = edge(...P(s.c)); x.fillStyle = col[s.type]; x.globalAlpha = e ? .5 : 1; x.fillRect(px - 3, py - 3, 6, 6); if (s.base) { x.strokeStyle = '#ffd890'; x.strokeRect(px - 5, py - 5, 10, 10); } }
   x.globalAlpha = 1;
+  for (const s of SP.sites) { if (!s.known) continue; const [px, py, e] = edge(...P(s.c)); if (s.frag && s.frag.g.visible) { x.strokeStyle = '#8fe8ff'; x.beginPath(); x.moveTo(px, py - 6); x.lineTo(px + 5, py); x.lineTo(px, py + 6); x.lineTo(px - 5, py); x.closePath(); x.stroke(); } if (s.pillar) { x.fillStyle = s.lit ? '#ffd890' : '#77736a'; x.fillRect(px - 2, py - 7, 4, 14); } }
+  if (SP.heart) { const [px, py] = edge(...P(SP.bubC)); x.fillStyle = '#ffd890'; x.beginPath(); x.arc(px, py, 6, 0, TAU); x.fill(); }
   if ((G.flags.samplesIn || 0) >= 3) for (const s of SP.sites) for (const d of s.deps) if (d.type === 'samples' && d.amt > 0) { const [px, py, e] = edge(...P(d.wp)); if (!e) { x.fillStyle = '#7af0a0'; x.beginPath(); x.arc(px, py, 2, 0, TAU); x.fill(); } }
   for (const b of G.bases) if (b.type === 'beacon') { const [px, py] = edge(...P(b.pos)); x.fillStyle = '#ff6a50'; x.beginPath(); x.arc(px, py, 3, 0, TAU); x.fill(); }
-  if (G.q.stage >= 9) { const [px, py] = edge(...P(SP.lighthouse.p)); x.fillStyle = '#fff0c0'; x.beginPath(); x.arc(px, py, 4, 0, TAU); x.fill(); }
+  if (G.q.stage >= 9 && SP.lighthouse) { const [px, py] = edge(...P(SP.lighthouse.p)); x.fillStyle = '#fff0c0'; x.beginPath(); x.arc(px, py, 4, 0, TAU); x.fill(); }
   { const [bx, by] = P(SP.bubC); x.strokeStyle = 'rgba(90,200,240,.6)'; x.lineWidth = 2; x.beginPath(); x.arc(bx, by, SP.bubR * sc, 0, TAU); x.stroke(); x.lineWidth = 1; }
   x.rotate(-S.yaw); x.fillStyle = '#e8f6f8'; x.beginPath(); x.moveTo(0, -8); x.lineTo(5, 6); x.lineTo(0, 3); x.lineTo(-5, 6); x.closePath(); x.fill();
   x.restore(); x.fillStyle = 'rgba(200,220,225,.6)'; x.font = '10px sans-serif'; x.fillText('N', W / 2 - 3, 11);
 }
 function lighthouseStory() {
-  UI.panel('The lighthouse', `<div style="line-height:1.6">The lamp is lit. Nobody is there.<br><br>The radio clicks, and a voice comes through, very faint and very calm: <i>"Keep the light on. They come when it goes out."</i><br><br>Ilse logs the position. The Depths keep going, deeper than any chart. There is more out there.</div>`);
+  UI.panel('The lighthouse', `<div style="line-height:1.6">The lamp is lit. Nobody is there.<br><br>The radio clicks, and a voice comes through, very faint and very calm: <i>"Keep the light on. The way out is in pieces. One in every structure. Put the core back together and it will carry you through the wall."</i><br><br>Okafor recognises the pattern on the lamp's base. It is a drive part. A <b>Hyperspeed Dash Core</b>, broken into fragments and scattered across the Depths.</div>`, () => G.fragCheck());
   sfx('ping');
 }
 function gameOver() {
@@ -485,9 +508,10 @@ function frame(now) {
   const st = G.state; const run = !G.paused && G.inPlay();
   if (run) G.time += dt;
   { const k = IN.keys, v = 650 * dt * IN.sens; if (k.ArrowLeft) IN.mx -= v; if (k.ArrowRight) IN.mx += v; if (k.ArrowUp) IN.my -= v * .7; if (k.ArrowDown) IN.my += v * .7; }
-  updateWorldAnim(dt, t);
+  updateWorldAnim(dt, t); updHeart(dt, t);
+  if (st === 'cut') { updateCut(dt); return; }
   if (st === 'title' || st === 'over') {
-    titleT += dt; if (st === 'title') { const a = titleT * .05; SP.ship.position.set(0, 0, 0); SP.ship.rotation.set(0, 0, 0); SP.ship.updateMatrixWorld(); camS.position.set(Math.cos(a) * 260 + 40, 45 + Math.sin(a * .7) * 20, Math.sin(a) * 260 + 120); camS.lookAt(0, 0, 110); SP.scene.fog.density = .00008; if (window.DBG) { camS.position.copy(DBG.p); camS.lookAt(DBG.l); } }
+    titleT += dt; if (st === 'title') { const a = titleT * .05; SP.ship.position.set(0, 0, 0); SP.ship.rotation.set(0, 0, 0); SP.ship.updateMatrixWorld(); camS.position.set(Math.cos(a) * 1500 + 40, 260 + Math.sin(a * .7) * 120, Math.sin(a) * 1500 + 420); camS.lookAt(0, 0, 420); SP.scene.fog.density = .00008; if (window.DBG) { camS.position.copy(DBG.p); camS.lookAt(DBG.l); } }
     updateDust(camS.position, 160); R.clear(); renderSpace(); return;
   }
   if (run) {
@@ -497,6 +521,7 @@ function frame(now) {
     if (st === 'helm') {
       const [dx, dy] = lookInput(.8); G.camYaw = clamp((G.camYaw || 0) - dx, -2.6, 2.6); G.camPitch = clamp((G.camPitch || .2) + dy * .6, -.3, 1.1);
       if (IN.take('view')) { G.view = G.view === 'out' ? 'bridge' : 'out'; sfx('ui'); }
+      if (IN.take('dash')) { G.ship.vel.set(0, 0, 0); travelMenu(); }
       if (IN.take('use') || IN.take('leave')) G.leaveHelm();
       IN.take('bag') && UI.showBag();
       if (G.hunted) { UI.warn('SOMETHING IS FOLLOWING THE SHIP'); setMood('dread'); } else { UI.warn(''); setMood('helm'); }

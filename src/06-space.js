@@ -19,9 +19,9 @@ function buildSpace() {
   const S = new THREE.Scene(); SP.scene = S;
   S.fog = new THREE.FogExp2(FOG_COL, .00008); S.background = FOG_COL.clone();
   // sky: deep space with nebula clouds and stars (blends to fog colour on spacewalks)
-  const dome = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24), new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, fog: false, uniforms: { fc: { value: FOG_COL }, fm: { value: 0 }, t: { value: 0 } },
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 24), new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, fog: false, uniforms: { fc: { value: FOG_COL }, fm: { value: 0 }, k0: { value: new THREE.Vector3(.012, .02, .038) }, k1: { value: new THREE.Vector3(.06, .2, .27) }, k2: { value: new THREE.Vector3(.24, .1, .32) }, t: { value: 0 } },
     vertexShader: 'varying vec3 vp;void main(){vp=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
-    fragmentShader: `uniform vec3 fc;uniform float fm;uniform float t;varying vec3 vp;
+    fragmentShader: `uniform vec3 fc;uniform float fm;uniform float t;uniform vec3 k0;uniform vec3 k1;uniform vec3 k2;varying vec3 vp;
 float h(vec3 p){p=fract(p*.3183099+.1);p*=17.;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
 float n(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);return mix(mix(mix(h(i),h(i+vec3(1,0,0)),f.x),mix(h(i+vec3(0,1,0)),h(i+vec3(1,1,0)),f.x),f.y),mix(mix(h(i+vec3(0,0,1)),h(i+vec3(1,0,1)),f.x),mix(h(i+vec3(0,1,1)),h(i+vec3(1,1,1)),f.x),f.y),f.z);}
 float fb(vec3 p){float s=0.,a=.5;for(int i=0;i<5;i++){s+=a*n(p);p*=2.03;a*=.5;}return s;}
@@ -29,14 +29,14 @@ float star(vec3 d,float sc,float th){vec3 p=d*sc;vec3 i=floor(p);float r=h(i);if
 void main(){vec3 d=normalize(vp);
  float w=fb(d*2.2+vec3(0.,0.,t*.003));float w2=fb(d*4.7+11.);
  float band=exp(-pow(d.y*2.6+sin(d.x*2.1+d.z)*.5,2.));
- vec3 c=vec3(.012,.02,.038);
- c+=mix(vec3(.06,.2,.27),vec3(.24,.1,.32),w2)*smoothstep(.42,.8,w)*(.55+band*.9);
- c+=vec3(.05,.09,.12)*band*w;
+ vec3 c=k0;
+ c+=mix(k1,k2,w2)*smoothstep(.42,.8,w)*(.55+band*.9);
+ c+=k1*.7*band*w;
  c+=vec3(.9,.95,1.)*star(d,260.,.985)+vec3(1.,.9,.8)*star(d,520.,.992)*.7+vec3(.8,.9,1.)*star(d,90.,.993)*1.3;
  gl_FragColor=vec4(mix(c,fc,fm),1.);}` }));
   dome.renderOrder = -1; S.add(dome); SP.dome = dome;
-  S.add(new THREE.HemisphereLight(0x8ab4c4, 0x2a2630, 2.6));
-  const sun = new THREE.DirectionalLight(0xc8dce4, 2.2); sun.position.set(.3, 1, .2); S.add(sun);
+  SP.hemi = new THREE.HemisphereLight(0x8ab4c4, 0x2a2630, 2.6); S.add(SP.hemi);
+  const sun = new THREE.DirectionalLight(0xc8dce4, 2.2); SP.sun = sun; sun.position.set(.3, 1, .2); S.add(sun);
   // suit lamp (attached to camera in EVA) and lantern light pool: fixed light count to avoid shader rebuilds
   SP.suitLamp = new THREE.SpotLight(0xe8f0ff, 0, 70, .5, .55, 1); S.add(SP.suitLamp); S.add(SP.suitLamp.target);
   for (let i = 0; i < 2; i++) { const L = new THREE.PointLight(0xffd9a0, 0, 40, 1.2); S.add(L); SP.lanternPool.push(L); }
@@ -47,9 +47,9 @@ void main(){vec3 d=normalize(vp);
   // the edge of the Depths: a glowing bubble you cannot fly through
   SP.bubC = new THREE.Vector3(0, 0, -600); SP.bubR = 3000;
   // the edge of the Depths: a wall of white fog all around (outside it, everything is white)
-  SP.bubble = new THREE.Mesh(new THREE.SphereGeometry(SP.bubR, 96, 48), new THREE.ShaderMaterial({ side: THREE.BackSide, transparent: true, depthWrite: false, fog: false, uniforms: { t: { value: 0 }, trick: { value: 0 }, cam: { value: new THREE.Vector3() }, ctr: { value: SP.bubC }, R: { value: SP.bubR } },
+  SP.bubble = new THREE.Mesh(new THREE.SphereGeometry(SP.bubR, 96, 48), new THREE.ShaderMaterial({ side: THREE.BackSide, transparent: true, depthWrite: false, fog: false, uniforms: { t: { value: 0 }, trick: { value: 0 }, w0: { value: new THREE.Vector3(.80, .84, .86) }, w1: { value: new THREE.Vector3(.97, .98, .99) }, cam: { value: new THREE.Vector3() }, ctr: { value: SP.bubC }, R: { value: SP.bubR } },
     vertexShader: 'uniform float trick;varying vec3 wp;void main(){vec4 w=modelMatrix*vec4(position,1.);wp=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;if(trick>.5)gl_Position.z=gl_Position.w*.99999;}',
-    fragmentShader: `uniform float t;uniform vec3 cam;uniform vec3 ctr;uniform float R;varying vec3 wp;
+    fragmentShader: `uniform float t;uniform vec3 cam;uniform vec3 ctr;uniform float R;uniform vec3 w0;uniform vec3 w1;varying vec3 wp;
 float h(vec3 p){p=fract(p*.3183099+.1);p*=17.;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
 float n(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);return mix(mix(mix(h(i),h(i+vec3(1,0,0)),f.x),mix(h(i+vec3(0,1,0)),h(i+vec3(1,1,0)),f.x),f.y),mix(mix(h(i+vec3(0,0,1)),h(i+vec3(1,0,1)),f.x),mix(h(i+vec3(0,1,1)),h(i+vec3(1,1,1)),f.x),f.y),f.z);}
 float fb(vec3 p){float s=0.,a=.5;for(int i=0;i<5;i++){s+=a*n(p);p*=2.07;a*=.5;}return s;}
@@ -57,13 +57,12 @@ void main(){vec3 d=normalize(wp-ctr);
  float c=fb(d*5.+vec3(t*.012,0.,t*.008)), c2=fb(d*13.-vec3(0.,t*.02,0.));
  float dist=length(wp-cam), near=smoothstep(R*1.2,R*.03,dist);
  float a=clamp(.16+c*.3+c2*.1+near*.6,0.,.97);
- vec3 col=mix(vec3(.80,.84,.86),vec3(.97,.98,.99),c);
+ vec3 col=mix(w0,w1,c);
  gl_FragColor=vec4(col,a);}` }));
   SP.bubble.position.copy(SP.bubC); SP.bubble.renderOrder = 5; SP.bubble.frustumCulled = false; S.add(SP.bubble);
   buildShip();
-  buildSites();
-  buildDecor();
-  buildCreatures();
+  buildPale();
+  buildZone('depths');
 }
 function updateDust(camPos, box) {
   const a = SP.dust.geometry.attributes.position, b = SP.dustBase; for (let i = 0; i < a.count; i++) {
@@ -249,24 +248,26 @@ const _bl = new THREE.Vector3();
 function pushOutBoxes(boxes, pos, pad, vel) { let hit = false; for (const B of boxes) { _bl.copy(pos).sub(B.c); if (Math.abs(_bl.x) > B.h.x + B.h.y + B.h.z + pad) continue; _bl.applyQuaternion(B.qi); const ox = B.h.x + pad - Math.abs(_bl.x), oy = B.h.y + pad - Math.abs(_bl.y), oz = B.h.z + pad - Math.abs(_bl.z); if (ox <= 0 || oy <= 0 || oz <= 0) continue;
   const n = new THREE.Vector3(); if (ox < oy && ox < oz) n.x = Math.sign(_bl.x) || 1; else if (oy < oz) n.y = Math.sign(_bl.y) || 1; else n.z = Math.sign(_bl.z) || 1; const m = Math.min(ox, oy, oz); n.applyQuaternion(B.qi.clone().invert()); pos.addScaledVector(n, m); if (vel) { const vn = vel.dot(n); if (vn < 0) vel.addScaledVector(n, -vn); } hit = true; } return hit; }
 function buildSites() {
-  rockTextures(); for (let i = 0; i < 6; i++) ROCK_GEOS.push(rockGeo(i + 1, i < 3 ? 4 : 3));
-  const r = rng(2024); const pts = [[0, -60, -760, 'ore']]; const types = ['wreck', 'ice', 'glass', 'ore', 'wreck', 'glass', 'ice'];
-  let tries = 0; while (pts.length < 14 && tries++ < 6000) { const p = inBubble(r, 700); if (pts.every(q => Math.hypot(q[0] - p.x, q[1] - p.y, q[2] - p.z) > 620)) pts.push([p.x, p.y, p.z, types[pts.length % types.length]]); }
+  const Z = SP.zone; rockTextures(); if (!ROCK_GEOS.length) for (let i = 0; i < 6; i++) ROCK_GEOS.push(rockGeo(i + 1, i < 3 ? 4 : 3));
+  const r = rng(2024 + Z.seed); const pts = Z.first ? [Z.first] : []; const types = Z.types;
+  let tries = 0; while (pts.length < Z.sites && tries++ < 8000) { const p = inBubble(r, 700); if (p.distanceTo(ARRIVE) < 600) continue; if (pts.every(q => Math.hypot(q[0] - p.x, q[1] - p.y, q[2] - p.z) > 620)) pts.push([p.x, p.y, p.z, types[pts.length % types.length]]); }
   const rockMat = new THREE.MeshStandardMaterial({ map: TX.rock, normalMap: TX.rockN, normalScale: new THREE.Vector2(1.4, 1.4), vertexColors: true, roughness: .92, metalness: 0 });
   SP.rockMat = rockMat;
   const filler = ROCK_GEOS.map(() => []);
   const rock = (s, pos, rad, sr, tint) => { s.rocks.push({ p: pos.clone().add(s.c), r: rad * .8 }); filler[(sr() * 6) | 0].push({ p: pos.clone().add(s.c), r: rad, rot: [sr() * TAU, sr() * TAU, sr() * TAU], tint: tint || SITE_T[s.type].tint, v: .8 + sr() * .35 }); };
   pts.forEach((p, i) => {
     const s = { i, type: p[3], c: new THREE.Vector3(p[0], p[1], p[2]), rocks: [], deps: [], boxes: [], surf: [], known: i < 1, name: SITE_T[p[3]].name + ' ' + String.fromCharCode(65 + (i % 26)), group: new THREE.Group() };
+    const tintZ = Z.tint || [1, 1, 1];
     SP.scene.add(s.group); s.group.position.copy(s.c); s.group.updateMatrixWorld(true);
     const sr = rng(500 + i);
     BUILD_SITE[s.type](s, sr, rock);
+    if (s.type !== 'pillar' && !Z.heart) addFragment(s);
     // scattered boulders around the structure
     for (let k = 0; k < 10; k++) { const d = new THREE.Vector3(sr() - .5, sr() - .5, sr() - .5).normalize().multiplyScalar(170 + sr() * 120); rock(s, d, 6 + sr() * 14, sr); }
     s.group.updateMatrixWorld(true);
     SP.sites.push(s);
   });
-  filler.forEach((list, gi) => { const im = new THREE.InstancedMesh(ROCK_GEOS[gi], rockMat, list.length); const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(); list.forEach((f, k) => { q.setFromEuler(e.set(...f.rot)); m4.compose(f.p, q, new THREE.Vector3(f.r, f.r, f.r)); im.setMatrixAt(k, m4); im.setColorAt(k, new THREE.Color(f.tint[0] * f.v, f.tint[1] * f.v, f.tint[2] * f.v)); }); SP.scene.add(im); (SP.rockIMs = SP.rockIMs || []).push(im); });
+  filler.forEach((list, gi) => { const im = new THREE.InstancedMesh(ROCK_GEOS[gi], rockMat, list.length); const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(); list.forEach((f, k) => { q.setFromEuler(e.set(...f.rot)); m4.compose(f.p, q, new THREE.Vector3(f.r, f.r, f.r)); im.setMatrixAt(k, m4); im.setColorAt(k, new THREE.Color(f.tint[0] * f.v * (Z.tint || [1,1,1])[0], f.tint[1] * f.v * (Z.tint || [1,1,1])[1], f.tint[2] * f.v * (Z.tint || [1,1,1])[2])); }); SP.scene.add(im); (SP.rockIMs = SP.rockIMs || []).push(im); });
   for (const s of SP.sites) for (const rk of s.rocks) SP.solids.push({ p: rk.p, r: rk.r });
 }
 // deposits sit on a surface point, pushed out along its normal
@@ -291,6 +292,7 @@ const BUILD_SITE = {
       const base = m.position.clone().add(new THREE.Vector3(0, -h / 2, 0).applyQuaternion(tilt)), tip = m.position.clone().add(new THREE.Vector3(0, h / 2, 0).applyQuaternion(tilt)); beamBox(s, base.clone().add(s.c), tip.clone().lerp(base, .15).add(s.c), rad * .55);
       rock(s, base, rad * 1.6, sr, [.75, .85, 1]); const out = new THREE.Vector3(Math.cos(a), 0, Math.sin(a)); depOn(s, 'ice', base.clone().add(s.c).addScaledVector(out, -rad * 1.4), out.clone().negate(), sr); }
     // floating crystal heart
+    s.fragAt = new THREE.Vector3(0, -48, 0);
     const heart = new THREE.Mesh(new THREE.OctahedronGeometry(22, 1), im); heart.scale.set(1, 1.8, 1); s.group.add(heart); s.surf.push(heart); s.rocks.push({ p: s.c.clone(), r: 24 }); s.blinkSpin = heart;
     const hg = glow(0x9fe0ff, 120, .4); s.group.add(hg);
     for (let k = 0; k < 4; k++) { const d = new THREE.Vector3(sr() - .5, sr() - .5, sr() - .5).normalize(); depOn(s, 'ice', s.c.clone().addScaledVector(d, 30), d, sr); }
@@ -319,7 +321,7 @@ function buildWreck(s, sr) {
   const plate = new THREE.MeshStandardMaterial({ map: TX.hull, normalMap: TX.hullN, color: 0x8a8580, roughness: .7, metalness: .45 });
   const darkM = new THREE.MeshStandardMaterial({ map: TX.hull, normalMap: TX.hullN, color: 0x4a4744, roughness: .8, metalness: .4 });
   const g = new THREE.Group(); g.rotation.set((sr() - .5) * .5, sr() * TAU, (sr() - .5) * .6); s.group.add(g); g.updateMatrixWorld(true);
-  const L = 280, W = 56, H = 44; const add = (w, h, d, x, y, z, m, rx, rz) => { const b = hbox(w, h, d, m || plate, x, y, z, g, 18); if (rx) b.rotation.x = rx; if (rz) b.rotation.z = rz; b.updateWorldMatrix(true, false); meshBox(s, b); s.surf.push(b); return b; };
+  const L = 280, W = 56, H = 44; g.updateMatrixWorld(true); s.fragAt = g.localToWorld(new THREE.Vector3(0, 7, 30)).sub(s.c); const add = (w, h, d, x, y, z, m, rx, rz) => { const b = hbox(w, h, d, m || plate, x, y, z, g, 18); if (rx) b.rotation.x = rx; if (rz) b.rotation.z = rz; b.updateWorldMatrix(true, false); meshBox(s, b); s.surf.push(b); return b; };
   // hull plating with torn gaps
   for (let z = -L / 2; z < L / 2; z += 20) { const zc = z + 10; const torn = k => sr() < k;
     if (!torn(.15)) add(W, 2, 19.6, 0, -H / 2, zc); if (!torn(.35)) add(W, 2, 19.6, 0, H / 2, zc);
@@ -395,8 +397,8 @@ function lighthouse(g) {
   return 30;
 }
 function buildDecor() {
-  const r = rng(4242); const kinds = Object.keys(DECOR);
-  for (let i = 0; i < 34; i++) {
+  const Z = SP.zone; const r = rng(4242 + Z.seed); const kinds = Object.keys(DECOR);
+  for (let i = 0; i < Z.decor; i++) {
     let p, ok = false; for (let k = 0; k < 50 && !ok; k++) { p = inBubble(r, 450); ok = SP.sites.every(s => s.c.distanceTo(p) > 420) && SP.decor.every(d2 => d2.p.distanceTo(p) > 360); }
     if (!ok) continue;
     const g = new THREE.Group(); const kind = i < kinds.length ? kinds[i] : kinds[(r() * kinds.length) | 0]; const sc = 2.2 + r() * 2.2; const rad = DECOR[kind](g, r) * sc;
@@ -404,7 +406,7 @@ function buildDecor() {
     SP.decor.push({ g, p, r: rad, kind, spin: (r() - .5) * .01 });
   }
   // the drowned lighthouse, far out
-  const g = new THREE.Group(); lighthouse(g); g.scale.setScalar(3.2); const p = new THREE.Vector3(1500, 600, -2300); g.position.copy(p); g.rotation.z = .2; SP.scene.add(g); SP.lighthouse = { g, p, r: 120, kind: 'lighthouse', spin: 0 }; SP.decor.push(SP.lighthouse);
+  if (Z.lighthouse) {  const g = new THREE.Group(); lighthouse(g); g.scale.setScalar(3.2); const p = new THREE.Vector3(1500, 600, -2300); g.position.copy(p); g.rotation.z = .2; SP.scene.add(g); SP.lighthouse = { g, p, r: 120, kind: 'lighthouse', spin: 0 }; SP.decor.push(SP.lighthouse); } else SP.lighthouse = null;
   for (const d of SP.decor) SP.solids.push({ p: d.p, r: d.r * .6 });
 }
 
@@ -417,12 +419,12 @@ function buildCreatures() {
       const r = lerp(150, 34, back) * (.7 + n * .5) * sc, g = lerp(140, 44, back) * (.7 + n * .5) * sc, b = lerp(122, 50, back) * (.7 + n * .5) * sc;
       const k = (j * W + i) * 4; id.data[k] = r + bl * 40; id.data[k + 1] = g + bl * 90; id.data[k + 2] = b + bl * 80; id.data[k + 3] = 255; }
     x.putImageData(id, 0, 0); const t = mkTex(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(3, 1); return t; })();
-  const skin = new THREE.MeshStandardMaterial({ map: skinTex, roughness: .55, metalness: .05, emissive: 0x0c1a1a, emissiveIntensity: 1 });
+  const skin = new THREE.MeshStandardMaterial({ map: skinTex, color: Z_SKIN(), roughness: .55, metalness: .05, emissive: 0x0c1a1a, emissiveIntensity: 1 });
   const bone = new THREE.MeshStandardMaterial({ color: 0xd8cfb8, roughness: .4 });
   const mouthM = new THREE.MeshStandardMaterial({ color: 0x2a0e10, roughness: .8, side: THREE.DoubleSide });
-  const r = rng(99);
+  const Z = SP.zone; const r = rng(99 + Z.seed);
   const K = 3.2; // they are big enough to wrap around a ship
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < Z.hunters; i++) {
     const g = new THREE.Group(); SP.scene.add(g);
     const NP = 18, spacing = 8.5 * K, RINGS = 64, SIDES = 16, len = (NP - 1) * spacing;
     const pts = []; const home = inBubble(r, 1000);
@@ -463,14 +465,13 @@ function buildCreatures() {
   // drifters: pale glowing jellies (harmless)
   const jm = new THREE.MeshBasicMaterial({ color: 0x9fe8e0, transparent: true, opacity: .35, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
   const tm = new THREE.LineBasicMaterial({ color: 0x8fd8d0, transparent: true, opacity: .35, blending: THREE.AdditiveBlending });
-  for (let i = 0; i < 46; i++) {
+  for (let i = 0; i < Z.drifters; i++) {
     const g = new THREE.Group(); const bell = new THREE.Mesh(new THREE.SphereGeometry(3, 14, 8, 0, TAU, 0, Math.PI / 2), jm); g.add(bell);
     for (let k = 0; k < 6; k++) { const pts = []; const a = k / 6 * TAU; for (let j = 0; j < 8; j++) pts.push(new THREE.Vector3(Math.cos(a) * 2, -j * 1.6, Math.sin(a) * 2)); const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), tm); g.add(l); }
     const gl = glow(0x8ff0e0, 14, .45); g.add(gl);
     g.position.copy(inBubble(r, 150)); g.scale.setScalar(.6 + r() * 1.4); SP.scene.add(g);
     SP.drifters.push({ g, bell, ph: r() * 10, v: new THREE.Vector3((r() - .5) * 2, (r() - .5) * .5, (r() - .5) * 2) });
   }
-  buildPale();
 }
 // rebuild a gulper's tube body along its spine
 const _gc = new THREE.CatmullRomCurve3(), _gt = new THREE.Vector3(), _gn = new THREE.Vector3(), _gb = new THREE.Vector3(), _gp = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);

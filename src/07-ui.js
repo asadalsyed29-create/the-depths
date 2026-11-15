@@ -59,7 +59,7 @@ function moveAxis() {
 // ---------- UI ----------
 const TOUCH_SETS = {
   ship: [['use', 'Use', 'big', 0, 0], ['up', 'Jump', '', 1, 0], ['run', 'Run', '', 0, 1], ['bag', 'Bag', 'sq', 't', 0], ['menu', 'Menu', 'sq', 't', 1]],
-  helm: [['up', 'Up', 'big', 0, 1], ['down', 'Down', 'big', 0, 0], ['view', 'View', 'sq', 't', 0], ['leave', 'Leave', 'sq', 't', 1], ['menu', 'Menu', 'sq', 't', 2]],
+  helm: [['up', 'Up', 'big', 0, 1], ['down', 'Down', 'big', 0, 0], ['view', 'View', 'sq', 't', 0], ['leave', 'Leave', 'sq', 't', 1], ['menu', 'Menu', 'sq', 't', 2], ['dash', 'Dash', 'sq', 't', 3]],
   eva: [['fire', 'Use', 'big', 0, 0], ['up', 'Up', '', 1, 0], ['down', 'Down', '', 1, 1], ['flare', 'Flare', '', 0, 1], ['build', 'Build', 'sq', 't', 0], ['bag', 'Bag', 'sq', 't', 1], ['menu', 'Menu', 'sq', 't', 2]],
   build: [['fire', 'Place', 'big', 0, 0], ['rot', 'Rotate', '', 1, 0], ['remove', 'Remove', '', 0, 1], ['up', 'Up', '', 2, 0], ['down', 'Down', '', 2, 1], ['build', 'Done', 'sq', 't', 0], ['menu', 'Menu', 'sq', 't', 1]],
 };
@@ -69,7 +69,7 @@ const UI = {
   touchSet(name) {
     if (this.curTouch === name) return; this.curTouch = name; const box = $('#tbs'); box.innerHTML = ''; const set = TOUCH_SETS[name]; if (!set) return;
     const R = 'calc(18px + env(safe-area-inset-right))';
-    for (const [a, label, cls, col, row] of set) {
+    for (const [a, label, cls, col, row] of set) { if (a === 'dash' && !G.flags.ended) continue;
       const b = document.createElement('button'); b.className = 'tb ' + cls; b.dataset.a = a; b.textContent = label;
       if (col === 't') { b.style.top = '10px'; b.style.right = `calc(${12 + row * 74}px + env(safe-area-inset-right))`; b.style.width = '68px'; }
       else { const big = cls === 'big'; b.style.right = `calc(${(big ? 20 : 30) + col * 84 + (col && 10)}px + env(safe-area-inset-right))`; b.style.bottom = `${(big ? 24 : 34) + row * 86}px`; }
@@ -125,6 +125,7 @@ const UI = {
         const cost = f.cost(lvl); return `<div class="row"><div class="d">${f.name}${f.max > 1 ? ` <span style="color:#8a9aa0">${lvl}/${f.max}</span>` : ''}<small>${locked ? f.lockText : f.desc}</small></div><span class="cost">${maxed ? 'Done' : locked ? '' : this.costHtml(cost)}</span><button data-i="${i}" ${maxed || locked || !G.canPay(cost) ? 'disabled' : ''}>Make</button></div>`;
       }).join('');
       b.querySelectorAll('button[data-i]').forEach(btn => btn.onclick = () => { const f = FAB[+btn.dataset.i]; const lvl = G.up[f.id] || 0; if (G.pay(f.cost(lvl))) { f.make(); sfx('place'); this.toast(f.name + ' made'); draw(); } });
+      if (G.q.stage === 11 || G.q.stage === 14) { const b = $('#panel .pb'); const row = document.createElement('div'); row.className = 'row'; row.innerHTML = `<div class="d">Hyperspeed Dash Core<small>Fuse the ${fragsHave()} fragments into one core.</small></div><button>Assemble</button>`; row.querySelector('button').onclick = () => { sfx('place'); sfx('swell', .6); this.toast('Hyperspeed Dash Core assembled. Take it to Chief Okafor in Engineering.', 4000); G.setStage(G.q.stage + 1); draw(); }; b.prepend(row); }
     };
     this.panel('Fabricator', ''); draw();
   },
