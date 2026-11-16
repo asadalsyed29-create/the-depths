@@ -1,12 +1,12 @@
 // ---------- crew members ----------
 const NPCS = [
-  { id: 'varga', name: 'Ilse Varga', role: 'Navigator', x: -4.6, z: -29.5, yaw: .6, look: { female: 1, skin: 0xd9a888, hair: 0x3a2416, style: 'Hair_Buns', suit: 0x2b3038, accent: 0x3a6ab0, tall: 1.02 } },
-  { id: 'okafor', name: 'Tomas Okafor', role: 'Chief Engineer', x: -5.5, z: 30.5, yaw: 1.2, look: { skin: 0x6a4430, hair: 0x141210, style: 'Hair_Buzzed', suit: 0x34302c, accent: 0xd07020, wide: 1.06 } },
-  { id: 'hartley', name: 'Dr. Mei Hartley', role: 'Medical Officer', x: 7.5, z: -18.5, yaw: -1.2, look: { female: 1, skin: 0xf0cdb0, hair: 0x121010, style: 'Hair_SimpleParted', suit: 0xd8dcdc, accent: 0x3aa0a8, tall: .97 } },
-  { id: 'benny', name: 'Benny Salas', role: 'Cook', x: -8, z: .5, yaw: Math.PI, look: { skin: 0xc49070, hair: 0x2a1c12, style: 'Hair_SimpleParted', beard: 1, suit: 0xe2ded6, accent: 0x8a8a88, wide: 1.12, tall: .97 }, path: [[-8, .3], [-5.5, .3]] },
-  { id: 'pryce', name: 'Dr. Anwen Pryce', role: 'Xenobiologist', x: 8.6, z: -5, yaw: -1.5, look: { female: 1, skin: 0xf2d4bc, hair: 0x7a3216, style: 'Hair_Long', suit: 0x2b3038, accent: 0x4a8a50 } },
-  { id: 'rook', name: 'Hal Rook', role: 'Quartermaster', x: -5, z: 8.5, yaw: -1.2, look: { skin: 0xe2b896, hair: 0x9a948a, style: 'Hair_Buzzed', beard: 1, suit: 0x3e4232, accent: 0xb09030, tall: 1.02 } },
-  { id: 'pell', name: 'Pell Arden', role: 'Hydroponics', x: -7.5, z: 19, yaw: 1.6, look: { skin: 0xe8c0a0, hair: 0xa8541e, style: 'Hair_SimpleParted', suit: 0x2b3038, accent: 0x6a9a40, tall: .96 } },
+  { id: 'varga', name: 'Ilse Varga', role: 'Navigator', x: -4.6, z: -29.5, yaw: .6, look: { female: 1, pants: 0x2a3550, trim: 0xd8dde0, skin: 0xc89a78, hair: 0x5a3a22, tall: 1.03 } },
+  { id: 'okafor', name: 'Tomas Okafor', role: 'Chief Engineer', x: -5.5, z: 30.5, yaw: 1.2, look: { top: 0xc8641e, bottom: 0x8a4a1a, skin: 0x5a3828, hair: 0x141210, wide: 1.08 } },
+  { id: 'hartley', name: 'Dr. Mei Hartley', role: 'Medical Officer', x: 7.5, z: -18.5, yaw: -1.2, look: { female: 1, pants: 0xe4e6e8, trim: 0x3aa0a8, skin: 0xe8c4a4, hair: 0x101010, tall: .95 } },
+  { id: 'benny', name: 'Benny Salas', role: 'Cook', x: -8, z: .5, yaw: Math.PI, look: { top: 0xeeeae2, bottom: 0x3a3a3e, skin: 0xa8866e, hair: 0x2a1c12, beard: 1, wide: 1.16, tall: .97 }, path: [[-8, .3], [-5.5, .3]] },
+  { id: 'pryce', name: 'Dr. Anwen Pryce', role: 'Xenobiologist', x: 8.6, z: -5, yaw: -1.5, look: { female: 1, pants: 0x2e5a3a, trim: 0xe08a30, skin: 0xf0d0b8, hair: 0x8a3a18, tall: 1.0 } },
+  { id: 'rook', name: 'Hal Rook', role: 'Quartermaster', x: -5, z: 8.5, yaw: -1.2, look: { top: 0x55603a, bottom: 0x2e3428, skin: 0xe2b896, hair: 0x9a948a, beard: 1, wide: 1.05, tall: 1.03 } },
+  { id: 'pell', name: 'Pell Arden', role: 'Hydroponics', x: -7.5, z: 19, yaw: 1.6, look: { top: 0x3e7a52, bottom: 0x6a5238, skin: 0xdcbca8, hair: 0xa8541e, tall: .96 } },
 ];
 function buildNPCs() {
   for (const n of NPCS) {
