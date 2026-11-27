@@ -1,0 +1,62 @@
+name: render-creatures
+on:
+  push:
+    branches: [claude/project-thread-dik3h8]
+    paths: ['render/*.py', '.github/workflows/render-creatures.yml']
+  workflow_dispatch:
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        chunk: ["eye 1 16", "eye 17 32", "eye 33 48", "eye 49 64", "eye 65 80", "eye 81 96", "eye 97 112", "eye 113 120", "root 1 16", "root 17 32", "root 33 48", "root 49 64", "root 65 80", "root 81 96", "root 97 112", "root 113 128", "root 129 144", "chimney 1 16", "chimney 17 32", "chimney 33 48", "chimney 49 64", "chimney 65 80", "chimney 81 96", "chimney 97 112", "chimney 113 128", "chimney 129 144", "beak 1 16", "beak 17 32", "beak 33 48", "beak 49 64", "beak 65 80", "beak 81 96", "beak 97 112", "beak 113 120", "urchins 1 16", "urchins 17 32", "urchins 33 48", "urchins 49 64", "urchins 65 80", "urchins 81 96", "urchins 97 112", "urchins 113 128", "urchins 129 144", "crawler 1 16", "crawler 17 32", "crawler 33 48", "crawler 49 64", "crawler 65 80", "crawler 81 96", "crawler 97 112", "crawler 113 128", "crawler 129 144", "sentinel 1 16", "sentinel 17 32", "sentinel 33 48", "sentinel 49 64", "sentinel 65 80", "sentinel 81 96", "sentinel 97 112", "sentinel 113 128", "sentinel 129 144", "starfish 1 16", "starfish 17 32", "starfish 33 48", "starfish 49 64", "starfish 65 80", "starfish 81 96", "starfish 97 112", "starfish 113 120", "shaggy 1 16", "shaggy 17 32", "shaggy 33 48", "shaggy 49 64", "shaggy 65 80", "shaggy 81 96", "shaggy 97 112", "shaggy 113 128", "shaggy 129 144", "shaggy 145 160", "shaggy 161 168", "eyeclose 1 16", "eyeclose 17 32", "eyeclose 33 48", "eyeclose 49 64", "eyeclose 65 80", "eyeclose 81 96", "eyeclose 97 112", "eyeclose 113 120"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: sudo apt-get update -q && sudo apt-get install -y -q libxi6 libxkbcommon0 libsm6 libgl1 libegl1 libxrender1 libxxf86vm1 libxfixes3
+      - run: pip install -q bpy==5.3.0 numpy
+      - name: render
+        run: |
+          set -- ${{ matrix.chunk }}
+          mkdir -p frames
+          RES=1080x608 SAMP=16 python render/shots.py $1 anim frames $2 $3 | grep -E "Saved|Error|Traceback" || true
+          ls frames/$1 | wc -l
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frames-${{ strategy.job-index }}
+          path: frames
+          retention-days: 3
+  collect:
+    needs: render
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: frames-*
+          merge-multiple: true
+          path: frames
+      - run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
+      - name: encode
+        run: |
+          mkdir -p render/out
+          for d in frames/*/; do
+            s=$(basename $d)
+            ls $d | wc -l > render/out/$s.count
+            ffmpeg -v error -y -framerate 24 -pattern_type glob -i "$d/f_*.png" -c:v libx264 -preset slow -crf 9 -pix_fmt yuv420p render/out/$s.mp4
+          done
+          ls -la render/out
+      - name: push
+        run: |
+          git config user.name "asadalsyed29-create"
+          git config user.email "asadalsyed29@gmail.com"
+          git add render/out
+          git commit -m "Rendered creature shots [skip ci]"
+          for i in 1 2 3 4; do git pull --rebase -q origin ${{ github.ref_name }} && git push origin HEAD:${{ github.ref_name }} && break; sleep 5; done
