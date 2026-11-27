@@ -701,6 +701,11 @@ def light(kind, loc, energy, color=(1, 1, 1), size=1.0, target=None, angle=None)
         ld.angle = math.radians(angle or 3)
     o = link_obj(bpy.data.objects.new(kind, ld))
     o.location = loc
+    try:
+        o.visible_camera = False
+        o.visible_glossy = False
+    except Exception:
+        pass
     if target is not None:
         aim_neg(o, target)
     return o

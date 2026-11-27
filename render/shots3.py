@@ -265,7 +265,7 @@ def shot_grinner():
             th = sphere('t%d_%d' % (s_, k), tuple(p), 0.03, (0.7, 0.55, 1.4), seg=10, rings=6, m=tooth)
             th.parent = hd
     # rises, tilts its head, keeps grinning
-    for f, z, rz, rx in [(1, -1.55, 0, 6), (int(F * 0.45), -0.35, 0, 0), (int(F * 0.7), 0.15, 12, -4), (F, 0.3, 14, -6)]:
+    for f, z, rz, rx in [(1, -1.0, 0, 6), (int(F * 0.45), -0.3, 0, 0), (int(F * 0.7), 0.15, 12, -4), (F, 0.3, 14, -6)]:
         key_loc(hd, f, (0, 0, z)); key_rot(hd, f, (rx, rz, 0))
     key_loc(cam, 1, (0, -5.4, 0.45)); key_loc(cam, F, (0, -4.0, 0.55))
     key_loc(tgt, 1, (0, 0, 0.0)); key_loc(tgt, F, (0, 0, 0.55))
