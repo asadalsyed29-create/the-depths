@@ -534,7 +534,7 @@ def parent(child, par):
     child.matrix_parent_inverse = par.matrix_world.inverted()
 
 def aim(o, target):
-    d = Vector(target) - o.matrix_world.translation
+    d = Vector(target) - Vector(o.location)
     o.rotation_mode = 'XYZ'
     o.rotation_euler = d.to_track_quat('Z', 'Y').to_euler()
 

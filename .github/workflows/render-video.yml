@@ -31,7 +31,7 @@ jobs:
         run: |
           set -- ${{ matrix.chunk }}
           mkdir -p frames
-          RES=1080x608 SAMP=16 python render/shots2.py $1 anim frames $2 $3 | grep -E "Saved|Error|Traceback" || true
+          RES=1080x608 SAMP=16 python render/shots3.py $1 anim frames $2 $3 | grep -E "Saved|Error|Traceback" || true
       - uses: actions/upload-artifact@v4
         with:
           name: part-${{ strategy.job-index }}
