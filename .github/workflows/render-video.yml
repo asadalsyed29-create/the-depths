@@ -1,8 +1,8 @@
-name: render-fix
+name: render-video
 on:
   push:
     branches: [claude/project-thread-dik3h8]
-    paths: ['render/fix.txt']
+    paths: ['render/jobs.txt']
 jobs:
   plan:
     runs-on: ubuntu-latest
@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: p
-        run: echo "m=$(python3 -c "import json;print(json.dumps([l.strip() for l in open('render/fix.txt') if l.strip()]))")" >> $GITHUB_OUTPUT
+        run: echo "m=$(python3 -c "import json;print(json.dumps([l.strip() for l in open('render/jobs.txt') if l.strip()]))")" >> $GITHUB_OUTPUT
   render:
     needs: plan
     runs-on: ubuntu-latest
@@ -31,10 +31,10 @@ jobs:
         run: |
           set -- ${{ matrix.chunk }}
           mkdir -p frames
-          RES=1080x608 SAMP=16 python render/shots.py $1 anim frames $2 $3 | grep -E "Saved|Error|Traceback" || true
+          RES=1080x608 SAMP=16 python render/shots2.py $1 anim frames $2 $3 | grep -E "Saved|Error|Traceback" || true
       - uses: actions/upload-artifact@v4
         with:
-          name: fix-${{ strategy.job-index }}
+          name: part-${{ strategy.job-index }}
           path: frames
           retention-days: 3
   collect:
@@ -47,7 +47,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          pattern: fix-*
+          pattern: part-*
           merge-multiple: true
           path: frames
       - run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
@@ -64,5 +64,5 @@ jobs:
           git config user.name "asadalsyed29-create"
           git config user.email "asadalsyed29@gmail.com"
           git add render/out
-          git commit -m "Re-rendered creature shots [skip ci]"
+          git commit -m "Rendered video shots [skip ci]"
           for i in 1 2 3 4; do git pull --rebase -q origin ${{ github.ref_name }} && git push origin HEAD:${{ github.ref_name }} && break; sleep 5; done

@@ -15,7 +15,7 @@ def setup_render(sc, frames, res=(960, 540), samples=24, out='/tmp/x_'):
     sc.cycles.device = 'CPU'
     sc.cycles.samples = samples
     sc.cycles.use_adaptive_sampling = True
-    sc.cycles.adaptive_threshold = 0.03
+    sc.cycles.adaptive_threshold = 0.05
     sc.cycles.use_denoising = True
     try:
         sc.cycles.denoiser = 'OPENIMAGEDENOISE'
@@ -490,7 +490,7 @@ def torus(name, loc, R, r, m=None):
     if m: assign(o, m)
     return o
 
-def tube(name, pts, r0, r1, m=None, res=4, bevel_res=6):
+def tube(name, pts, r0, r1, m=None, res=4, bevel_res=6, radii=None):
     """Tapered tube along a list of points."""
     cu = bpy.data.curves.new(name, 'CURVE')
     cu.dimensions = '3D'
@@ -504,7 +504,7 @@ def tube(name, pts, r0, r1, m=None, res=4, bevel_res=6):
     for i, p in enumerate(pts):
         t = i / (n - 1)
         sp.points[i].co = (p[0], p[1], p[2], 1)
-        sp.points[i].radius = r0 + (r1 - r0) * t
+        sp.points[i].radius = radii[i] if radii else r0 + (r1 - r0) * t
     sp.use_endpoint_u = True
     sp.order_u = 4
     o = link_obj(bpy.data.objects.new(name, cu))
