@@ -254,7 +254,7 @@ def shot_crawler():
     g = ground(60, turf, 0.4, 4)
     add_mat_slot(g, grass)
     fur(g, 'grass', count=9000, length=0.45, children=10, rough=0.1, frizz=0.05, radius=0.006, clump=0.3, rand=0.4, seed=5)
-    shell = skin('shell', [hexc('3a1606'), hexc('8a3c12'), hexc('c4752e'), hexc('e9b468')], scale=2.5, cell=2.2, bump=0.8, coat=0.6, rough=0.3)
+    shell = skin('shell', [hexc('3a1606'), hexc('8a3c12'), hexc('c4752e'), hexc('e9b468')], scale=2.5, cell=2.2, bump=0.8, coat=0.3, rough=0.38)
     gearm = metal_mat('gear', (0.08, 0.15, 0.5), (0.05, 0.08, 0.3), 6, rough=0.2)
     bc = Vector((0, 0, 1.1))
     body = sphere('body', tuple(bc), 1.4, (1.3, 1.0, 0.7), m=shell)
@@ -297,8 +297,8 @@ def shot_crawler():
     for sx in (-1, 1):
         mb = cone('mand%d' % sx, tuple(bc + Vector((sx * 0.3, -1.95, -0.1))), 0.12, 0.01, 0.8, shell, seg=12)
         mb.rotation_euler = (math.radians(100), 0, math.radians(-sx * 25))
-    cam, tgt = camera((2.5, -8.5, 2.0), (0, -0.5, 1.6), lens=38)
-    key_loc(cam, 1, (3.5, -8.0, 1.8)); key_loc(cam, F, (1.2, -8.4, 2.2))
+    cam, tgt = camera((2.5, -10.5, 2.4), (0, -0.6, 2.05), lens=35)
+    key_loc(cam, 1, (3.6, -10.2, 2.2)); key_loc(cam, F, (1.2, -9.9, 2.6))
     light('AREA', (-5, -6, 6), 1400, (1.0, 0.85, 0.7), 5, target=tuple(bc))
     light('AREA', (5, 4, 4), 900, (0.5, 0.6, 1.0), 5, target=tuple(bc))
     return sc, F

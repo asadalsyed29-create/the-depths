@@ -1,8 +1,5 @@
 name: render-creatures
 on:
-  push:
-    branches: [claude/project-thread-dik3h8]
-    paths: ['render/*.py', '.github/workflows/render-creatures.yml']
   workflow_dispatch:
 jobs:
   render:
