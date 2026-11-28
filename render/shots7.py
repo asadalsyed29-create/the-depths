@@ -13,7 +13,7 @@ import bpy, bmesh
 S = lambda s: int(s * FPS)
 RES = tuple(int(x) for x in os.environ.get('RES', '960x540').split('x'))
 SAMP = int(os.environ.get('SAMP', '20'))
-DUR = {'worm': 6, 'barnacle': 7, 'valve': 6, 'moth': 6, 'petal': 7, 'twins': 6, 'crab': 6, 'lichen': 6, 'stare': 7}
+DUR = {'worm': 6, 'barnacle': 7, 'valve': 6, 'moth': 6, 'petal': 7, 'twins': 6, 'crab': 6, 'lichen': 6, 'stare': 7, 'jump': 4}
 
 IRIS = {
     'hazel': [hexc('1a0c04'), hexc('5a3410'), hexc('a86e2a'), hexc('d8b070')],
@@ -414,6 +414,58 @@ def shot_stare():
     for fr, s in [(1, 1.0), (118, 1.0), (124, 1.08), (F, 1.08)]:
         key_scale(rig['sock'], fr, (0.9 * s, 0.9 * s, 0.9 * s))
     lights3((0, 0, 0), key=(-2.5, -2.5, 2), keyE=600, rim=(2.5, 2.5, 2), rimE=1400, fill=(2, -2.5, -1.5), fillE=160, size=1.6)
+    return sc, F
+
+def shot_jump():
+    """Darkness, one far eye blinks. Then a pale many-eyed mouth-thing lunges out and fills the frame."""
+    F = S(DUR['jump']); sc = reset(); _m.clear()
+    black()
+    cam = still_cam((0, -3.0, 0.0), (0, 0, 0.0), lens=24)
+    root = empty('J', (0, 0, 0))
+    head = blob('jhead', (0, 0, 0), 1.6, SK('pale'), sq=(1.05, 0.9, 1.3), disp=0.3, size=0.35)
+    parent(head, root)
+    # gaping mouth: black throat ringed by two rows of long uneven teeth, raw pink lips
+    mo = empty('jmo', (0, -1.55, -0.55)); parent(mo, root)
+    throat = sphere('jthroat', (0, -1.45, -0.55), 0.75, (1.0, 0.5, 0.8), m=simple_mat('jvoid', (0.0, 0.0, 0.0), rough=1)); parent(throat, mo)
+    lip = torus('jlip', (0, -1.6, -0.55), 0.78, 0.13, SK('pink')); lip.rotation_euler = (math.radians(90), 0, 0); lip.scale = (1, 1.25, 1); parent(lip, mo)
+    tm = bone_mat('jt')
+    rnd = random.Random(66)
+    for ring, (R, L0) in enumerate([(0.74, 0.32), (0.55, 0.22)]):
+        for k in range(26 - ring * 6):
+            a = k / (26 - ring * 6) * math.tau + ring * 0.1
+            x, z = math.cos(a) * R, math.sin(a) * R * 1.25 - 0.55
+            th = cone('jth%d_%d' % (ring, k), (x, -1.6 + ring * 0.1, z), 0.05, 0.004, L0 * rnd.uniform(0.6, 1.4), tm, seg=6)
+            d = Vector((-x, 0.25, -(z + 0.55))).normalized()
+            th.rotation_mode = 'QUATERNION'; th.rotation_quaternion = d.to_track_quat('Z', 'Y')
+            parent(th, mo)
+    for f, s_ in [(1, 0.55), (60, 0.55), (64, 1.25), (70, 1.12), (F, 1.18)]:
+        key_scale(mo, f, (1, 1, s_))
+    # many mismatched eyes, closed until the lunge, then all wide open at once
+    spots = [(-0.95, 0.75, 0.42, 'red'), (0.9, 0.85, 0.36, 'violet'), (-0.1, 1.15, 0.24, 'green'), (0.35, 0.45, 0.18, 'blue'),
+             (-1.35, 0.1, 0.2, 'hazel'), (1.35, 0.15, 0.26, 'orange'), (-0.55, 1.45, 0.14, 'hazel'), (0.7, 1.45, 0.16, 'red'),
+             (-0.45, 0.35, 0.12, 'blue'), (1.0, -0.45, 0.13, 'green')]
+    rigs = []
+    for k, (x, z, r, ir) in enumerate(spots):
+        y = -math.sqrt(max(0.05, 1.0 - (x / 1.68) ** 2 - (z / 2.08) ** 2)) * 1.44 - 0.05
+        rig = eye2('JE%d' % k, (x, y, z), r, (x * 0.3, -4, z * 0.3), ir, SK('pink'), F=F)
+        lid_key(rig, 1, 1); lid_key(rig, 60 + (k % 3), 1); lid_key(rig, 63 + (k % 3), 0)
+        stare(rig, cam)
+        parent(rig['sock'], root)
+        rigs.append(rig)
+    # one small eye open in the dark beforehand, blinking once
+    lid_key(rigs[3], 14, 1); lid_key(rigs[3], 18, 0); blink(rigs[3], 40)
+    blades('jbl', (0, 0.4, 0.2), 1.75, 90, skin('jleaf', [hexc('0a0606'), hexc('3a1a14'), hexc('7a4a3a')], scale=6, bump=1.2, coat=0.6, metal=0.3, stretch=(1, 1, 0.15)), 9, length=(0.9, 2.0), width=0.2, bias=(0, 0.7, 0), par=root)
+    spikes('jsp', (0, 0.3, 0.6), 1.6, 26, bone_mat('jb', dark=True), 13, lo=0.4, hi=1.2, half=(0, 0.6, 1), par=root)
+    # far away and still, then a 4-frame lunge right into the lens with a twitch after
+    for f, loc in [(1, (0, 16, 0.3)), (58, (0, 15.5, 0.3)), (62, (0, 2.2, 0.0)), (64, (0, 0.7, 0.05)), (68, (0, 1.2, 0.0)), (96, (0, 1.05, 0.0))]:
+        key_loc(root, f, loc)
+    root.rotation_mode = 'XYZ'
+    for f in range(64, F + 1, 2):
+        key_rot(root, f, (rnd.uniform(-3, 3), rnd.uniform(-3, 3), rnd.uniform(-4, 4)))
+    # light from below and a cold rim; harsh
+    light('AREA', (0, -2.2, -2.2), 900, (1.0, 0.8, 0.65), 1.5, target=(0, 0, 0))
+    light('AREA', (2.5, 3, 2.5), 1800, (0.6, 0.7, 1.0), 2.5, target=(0, 0, 0))
+    light('AREA', (-2.5, -1.5, 2.0), 300, (1.0, 0.6, 0.6), 1.5, target=(0, 0, 0))
     return sc, F
 
 SHOTS = {k: globals()['shot_' + k] for k in DUR}
