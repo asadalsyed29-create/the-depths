@@ -13,7 +13,7 @@ import bpy, bmesh
 S = lambda s: int(s * FPS)
 RES = tuple(int(x) for x in os.environ.get('RES', '960x540').split('x'))
 SAMP = int(os.environ.get('SAMP', '20'))
-DUR = {'worm': 6, 'barnacle': 7, 'valve': 6, 'moth': 6, 'petal': 7, 'twins': 6, 'crab': 6, 'lichen': 6, 'stare': 7, 'jump': 4}
+DUR = {'worm': 6, 'barnacle': 7, 'valve': 6, 'moth': 6, 'petal': 7, 'twins': 6, 'crab': 6, 'lichen': 6, 'stare': 7, 'jump': 4, 'tongue': 6, 'hanging': 6, 'tv': 6, 'molar': 6}
 
 IRIS = {
     'hazel': [hexc('1a0c04'), hexc('5a3410'), hexc('a86e2a'), hexc('d8b070')],
@@ -466,6 +466,124 @@ def shot_jump():
     light('AREA', (0, -2.2, -2.2), 900, (1.0, 0.8, 0.65), 1.5, target=(0, 0, 0))
     light('AREA', (2.5, 3, 2.5), 1800, (0.6, 0.7, 1.0), 2.5, target=(0, 0, 0))
     light('AREA', (-2.5, -1.5, 2.0), 300, (1.0, 0.6, 0.6), 1.5, target=(0, 0, 0))
+    return sc, F
+
+def shot_tongue():
+    """A stack of lipped mouths; a long tongue with an eye at its tip slides out and searches."""
+    F = S(DUR['tongue']); sc = reset(); _m.clear()
+    black()
+    cam = still_cam((0, -4.2, 1.6), (0, 0, 1.7), lens=24)
+    col = blob('tcol', (0, 0.6, 1.2), 1.2, SK('rust'), sq=(1, 0.9, 2.0), disp=0.25)
+    tm = bone_mat('tt')
+    for k, z in enumerate([0.2, 1.3, 2.4]):
+        lip = torus('tl%d' % k, (0, -0.35, z), 0.38, 0.1, SK('pink')); lip.rotation_euler = (math.radians(90), 0, 0); lip.scale = (1.3, 0.7, 1)
+        hole = sphere('th%d' % k, (0, -0.3, z), 0.33, (1.25, 0.4, 0.6), m=simple_mat('tv%d' % k, (0, 0, 0), rough=1))
+        for i in range(12):
+            a = i / 12 * math.tau
+            th = cone('ttt%d_%d' % (k, i), (math.cos(a) * 0.4, -0.4, z + math.sin(a) * 0.22), 0.03, 0.0, 0.1, tm, seg=6)
+            th.rotation_mode = 'QUATERNION'; th.rotation_quaternion = Vector((-math.cos(a), 0, -math.sin(a))).normalized().to_track_quat('Z', 'Y')
+    spikes('tsp', (0, 0.9, 1.4), 1.3, 22, bone_mat('tsb', dark=True), 5, half=(0, 1, 0.3))
+    # tongue from the middle mouth: chain of segments that extends and curls toward us
+    base = empty('tbase', (0, -0.4, 1.3))
+    segs = []
+    prev = base
+    for i in range(9):
+        e = empty('tg%d' % i, (0, -0.4 - 0.22 * (i + 1), 1.3))
+        sg = sphere('tgs%d' % i, (0, -0.4 - 0.22 * (i + 1), 1.3), 0.16 - 0.008 * i, (1.2, 1.4, 0.7), m=SK('pink'))
+        parent(sg, e); parent(e, prev); prev = e; segs.append(e)
+        e.rotation_mode = 'XYZ'
+        noise_anim(e, 'rotation_euler', 0, 0.12, 20, phase=i * 7); noise_anim(e, 'rotation_euler', 2, 0.18, 24, phase=i * 3)
+    tip = segs[-1]
+    rig = eye2('TG', (0, -0.4 - 0.22 * 9 - 0.2, 1.3), 0.2, (0, -5, 1.3), 'green', SK('pink'), F=F, darts_seed=31, blinks=(90,))
+    stare(rig, cam, snap=118)
+    parent(rig['sock'], tip)
+    key_scale(base, 1, (0.05, 0.05, 0.05)); key_scale(base, 24, (0.05, 0.05, 0.05)); key_scale(base, 60, (1, 1, 1))
+    lights3((0, 0, 1.4), key=(-3, -4, 3), keyE=1100, rim=(3, 3, 4), rimE=2200, fill=(3, -3, -0.5), fillE=220, size=2)
+    return sc, F
+
+def shot_hanging():
+    """Something hangs upside down out of the dark, eyes dangling below it on cords, slowly turning."""
+    F = S(DUR['hanging']); sc = reset(); _m.clear()
+    black()
+    cam = still_cam((0, -5.0, 0.6), (0, 0, 1.6), lens=24)
+    body = blob('hb', (0, 0, 3.4), 1.3, SK('bark'), sq=(1, 1, 1.4), disp=0.3)
+    for k in range(10):
+        a = k / 10 * math.tau
+        tube('hr%d' % k, walk((math.cos(a) * 0.6, math.sin(a) * 0.6, 4.4), (math.cos(a) * 0.2, math.sin(a) * 0.2, 1), 6, 0.6, 0.2, seed=k), 0.12, 0.05, SK('bark'))
+    piv = empty('hpiv', (0, 0, 5)); parent(body, piv)
+    rnd = random.Random(2)
+    cab = simple_mat('hcab', (0.03, 0.02, 0.02), rough=0.3, coat=0.4)
+    for k in range(8):
+        a = k / 8 * math.tau + 0.3
+        x, y = math.cos(a) * 0.9, math.sin(a) * 0.7
+        L = rnd.uniform(1.2, 2.6)
+        top = (x, y, 2.6)
+        e = empty('hc%d' % k, top)
+        t = tube('hcord%d' % k, [top, (x, y, 2.6 - L / 2), (x, y, 2.6 - L)], 0.025, 0.02, cab)
+        rig = eye2('H%d' % k, (x, y, 2.6 - L - 0.2), rnd.uniform(0.16, 0.3), (x, -5, 2.6 - L), rnd.choice(list(IRIS)), SK('bark'), F=F)
+        stare(rig, cam, snap=40 + k * 9)
+        parent(t, e); parent(rig['sock'], e); parent(e, body)
+        e.rotation_mode = 'XYZ'
+        noise_anim(e, 'rotation_euler', 0, 0.06, 40); noise_anim(e, 'rotation_euler', 1, 0.06, 40)
+    spikes('hsp', (0, 0, 3.4), 1.3, 24, bone_mat('hsb', dark=True), 7, half=(0, -0.5, -1), par=body)
+    piv.rotation_mode = 'XYZ'
+    key_rot(piv, 1, (0, 0, -25)); key_rot(piv, F, (0, 0, 25))
+    lights3((0, 0, 1.8), key=(-3, -4, 0), keyE=1500, rim=(3, 4, 4), rimE=2800, fill=(2, -3, -2), fillE=300, size=2.5)
+    return sc, F
+
+def shot_tv():
+    """An old TV in a dark room. The screen bulges like skin and an eye pushes through it."""
+    F = S(DUR['tv']); sc = reset(); _m.clear(); _hm.clear()
+    black()
+    H = house_mats()
+    floor = cube('floor', (0, 2, -0.05), (12, 12, 0.1), skin('boards', [hexc('1a0e06'), hexc('3a2412'), hexc('5a3a1e')], scale=2, cell=8, bump=0.6, coat=0.3, stretch=(1, 8, 1)))
+    wp = shots6.tex_mat('wallp', 'siding', hexc('3a4a3a'), hexc('344234'), scale=3, row=0.08, bump=0.2)
+    cube('wall', (0, 3.5, 2), (12, 0.1, 4.2), wp)
+    stand = cube('stand', (0, 1.6, 0.35), (1.8, 0.8, 0.7), H['door'])
+    case = cube('case', (0, 1.6, 1.25), (1.3, 1.0, 1.05), simple_mat('tvcase', (0.06, 0.05, 0.045), rough=0.35, coat=0.3))
+    bez = cube('bez', (0, 1.08, 1.27), (1.15, 0.04, 0.9), simple_mat('bez', (0.02, 0.02, 0.02), rough=0.4))
+    for i, x in enumerate((0.45, 0.45)):
+        cylinder('knob%d' % i, (0.5, 1.06, 1.0 + 0.18 * i), 0.04, 0.03, RUST(), seg=10)
+    # screen membrane: glowing grey static skin that bulges toward us
+    scr = sphere('scr', (-0.07, 1.05, 1.3), 0.42, (1.0, 0.12, 0.78), m=skin('scrm', [hexc('5a6a6a'), hexc('8a9a98'), hexc('c4d0cc')], scale=8, cell=1.5, bump=0.6, coat=0.9, sss=0.4))
+    for f, sy in [(1, 0.12), (40, 0.14), (70, 0.6), (90, 0.75), (F, 0.8)]:
+        key_scale(scr, f, (1.0, sy, 0.78))
+    glow = light('AREA', (-0.07, 0.6, 1.3), 40, (0.7, 0.85, 1.0), 0.8, target=(-0.07, -3, 1.0))
+    rig = eye2('TV', (-0.07, 1.0, 1.3), 0.3, (0, -4, 1.2), 'blue', SK('pale'), F=F, blinks=(120,))
+    lid_key(rig, 1, 1); lid_key(rig, 84, 1); lid_key(rig, 92, 0)
+    stare(rig, cam=None) if False else None
+    for f, y in [(1, 1.25), (60, 1.25), (90, 0.72), (F, 0.68)]:
+        key_loc(rig['sock'], f, (-0.07, y, 1.3))
+    cam = still_cam((0.6, -2.4, 1.1), (0, 1.5, 1.2), lens=26)
+    stare(rig, cam, snap=96)
+    cube('lamp', (-2.5, 2.8, 0.8), (0.3, 0.3, 1.6), H['concrete'])
+    light('POINT', (-2.5, 2.4, 1.8), 30, (1.0, 0.6, 0.3), 0.2)
+    lights3((0, 1.5, 1.2), key=(-2, -2, 2.5), keyE=250, rim=(2.5, 3, 3), rimE=500, fill=(2, -2, 0.5), fillE=80, size=1.5)
+    return sc, F
+
+def shot_molar():
+    """A boulder made of huge yellowed teeth sits on a road; eyes roll around in the gaps between them."""
+    F = S(DUR['molar']); sc = reset(); _m.clear(); _hm.clear()
+    black(1.0, stars=True)
+    H = house_mats()
+    cube('road', (0, 4, 0.0), (8, 40, 0.1), H['asphalt'])
+    for k in range(-2, 6):
+        cube('dash%d' % k, (0, k * 4, 0.06), (0.15, 1.6, 0.02), simple_mat('paint', (0.6, 0.55, 0.3), rough=0.6))
+    cam = still_cam((0.6, -3.6, 0.9), (0, 2.5, 1.3), lens=24)
+    tooth = skin('molarm', [hexc('5a4a2a'), hexc('a89060'), hexc('d8c8a0'), hexc('f0e8d0')], scale=3, cell=1.2, bump=0.8, coat=0.6, rough=0.3, crease=0.6)
+    gum = SK('pink')
+    core = blob('mcore', (0, 3, 1.4), 1.3, gum, disp=0.2)
+    rnd = random.Random(5)
+    for k in range(34):
+        d = Vector((rnd.uniform(-1, 1), rnd.uniform(-1, 1), rnd.uniform(-0.6, 1))).normalized()
+        t = blob('mt%d' % k, tuple(Vector((0, 3, 1.4)) + d * 1.25), rnd.uniform(0.32, 0.5), tooth, sq=(1, 1, 1.4), disp=0.15, size=0.3, sub=1)
+        t.rotation_mode = 'QUATERNION'; t.rotation_quaternion = d.to_track_quat('Z', 'Y')
+    for k in range(6):
+        d = Vector((rnd.uniform(-0.8, 0.8), -1, rnd.uniform(-0.3, 0.8))).normalized()
+        p = Vector((0, 3, 1.4)) + d * 1.25
+        rig = eye2('ME%d' % k, tuple(p), rnd.uniform(0.14, 0.24), tuple(p + d * 3), rnd.choice(list(IRIS)), gum, F=F, darts_seed=60 + k)
+        if k < 3: stare(rig, cam, snap=70 + 15 * k)
+    lights3((0, 3, 1.3), key=(-3, -2, 4), keyE=1500, rim=(3, 7, 4), rimE=3000, fill=(3, -2, 0.5), fillE=300, size=3)
     return sc, F
 
 SHOTS = {k: globals()['shot_' + k] for k in DUR}
